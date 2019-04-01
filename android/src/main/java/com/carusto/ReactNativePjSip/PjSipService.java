@@ -30,11 +30,14 @@ import com.facebook.react.bridge.ReadableMapKeySetIterator;
 import org.json.JSONObject;
 import org.pjsip.pjsua2.AccountConfig;
 import org.pjsip.pjsua2.AudDevManager;
+import org.pjsip.pjsua2.AudioMedia;
 import org.pjsip.pjsua2.AuthCredInfo;
+import org.pjsip.pjsua2.CallMediaInfo;
 import org.pjsip.pjsua2.CallOpParam;
 import org.pjsip.pjsua2.CallSetting;
 import org.pjsip.pjsua2.Endpoint;
 import org.pjsip.pjsua2.EpConfig;
+import org.pjsip.pjsua2.Media;
 import org.pjsip.pjsua2.OnCallStateParam;
 import org.pjsip.pjsua2.OnRegStateParam;
 import org.pjsip.pjsua2.SipHeader;
@@ -47,9 +50,11 @@ import org.pjsip.pjsua2.CodecInfo;
 import org.pjsip.pjsua2.VideoDevInfo;
 import org.pjsip.pjsua2.pj_qos_type;
 import org.pjsip.pjsua2.pjmedia_orient;
+import org.pjsip.pjsua2.pjmedia_type;
 import org.pjsip.pjsua2.pjsip_inv_state;
 import org.pjsip.pjsua2.pjsip_status_code;
 import org.pjsip.pjsua2.pjsip_transport_type_e;
+import org.pjsip.pjsua2.pjsua_call_media_status;
 
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -388,6 +393,8 @@ public class PjSipService extends Service {
                 break;
             case PjActions.ACTION_DTMF_CALL:
                 handleCallDtmf(intent);
+            case PjActions.ACTION_CONFERENCE_CALL:
+                handleCallConference(intent);
             case PjActions.ACTION_CHANGE_CODEC_SETTINGS:
                 handleChangeCodecSettings(intent);
                 break;
@@ -488,11 +495,11 @@ public class PjSipService extends Service {
 
         // General settings
         AuthCredInfo cred = new AuthCredInfo(
-            "Digest",
-            configuration.getNomalizedRegServer(),
-            configuration.getUsername(),
-            0,
-            configuration.getPassword()
+                "Digest",
+                configuration.getNomalizedRegServer(),
+                configuration.getUsername(),
+                0,
+                configuration.getPassword()
         );
 
         String idUri = configuration.getIdUri();
@@ -662,7 +669,7 @@ public class PjSipService extends Service {
             callOpParam.delete();
 
             // Automatically put other calls on hold.
-            doPauseParallelCalls(call);
+//            doPauseParallelCalls(call);
 
             mCalls.add(call);
             mEmitter.fireIntentHandled(intent, call.toJson());
@@ -869,6 +876,39 @@ public class PjSipService extends Service {
         }
     }
 
+    private void handleCallConference(Intent intent) {
+        try {
+
+            List<AudioMedia> mCallsAudioMedia = new ArrayList<>();
+            for (PjSipCall currCall : mCalls)
+            {
+                for (int i = 0; i < currCall.getInfo().getMedia().size(); i++) {
+                    currCall.unhold();
+                    Media media = currCall.getMedia(i);
+                    CallMediaInfo mediaInfo = currCall.getInfo().getMedia().get(i);
+                    if (mediaInfo.getType() == pjmedia_type.PJMEDIA_TYPE_AUDIO
+                            && media != null) {
+                        AudioMedia audioMedia = AudioMedia.typecastFromMedia(media);
+                        mCallsAudioMedia.add(audioMedia);
+
+                    }
+                }
+            }
+
+            for (int i = 0; i < mCallsAudioMedia.size(); i++) {
+                for (int j = 0; j < mCallsAudioMedia.size(); j++) {
+                    if( i != j) {
+                        mCallsAudioMedia.get(i).startTransmit(mCallsAudioMedia.get(j));
+                    }
+                }
+            }
+
+            mEmitter.fireIntentHandled(intent);
+        } catch (Exception e) {
+            mEmitter.fireIntentHandled(intent, e);
+        }
+    }
+
     private void handleChangeCodecSettings(Intent intent) {
         try {
             Bundle codecSettings = intent.getExtras();
@@ -935,39 +975,39 @@ public class PjSipService extends Service {
         }
 
         /**
-        // Automatically start application when incoming call received.
-        if (mAppHidden) {
-            try {
-                String ns = getApplicationContext().getPackageName();
-                String cls = ns + ".MainActivity";
+         // Automatically start application when incoming call received.
+         if (mAppHidden) {
+         try {
+         String ns = getApplicationContext().getPackageName();
+         String cls = ns + ".MainActivity";
 
-                Intent intent = new Intent(getApplicationContext(), Class.forName(cls));
-                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.EXTRA_DOCK_STATE_CAR);
-                intent.addCategory(Intent.CATEGORY_LAUNCHER);
-                intent.putExtra("foreground", true);
+         Intent intent = new Intent(getApplicationContext(), Class.forName(cls));
+         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.EXTRA_DOCK_STATE_CAR);
+         intent.addCategory(Intent.CATEGORY_LAUNCHER);
+         intent.putExtra("foreground", true);
 
-                startActivity(intent);
-            } catch (Exception e) {
-                Log.w(TAG, "Failed to open application on received call", e);
-            }
+         startActivity(intent);
+         } catch (Exception e) {
+         Log.w(TAG, "Failed to open application on received call", e);
+         }
+         }
+
+         job(new Runnable() {
+        @Override
+        public void run() {
+        // Brighten screen at least 10 seconds
+        PowerManager.WakeLock wl = mPowerManager.newWakeLock(
+        PowerManager.ACQUIRE_CAUSES_WAKEUP | PowerManager.ON_AFTER_RELEASE | PowerManager.FULL_WAKE_LOCK,
+        "incoming_call"
+        );
+        wl.acquire(10000);
+
+        if (mCalls.size() == 0) {
+        mAudioManager.setSpeakerphoneOn(true);
         }
-
-        job(new Runnable() {
-            @Override
-            public void run() {
-                // Brighten screen at least 10 seconds
-                PowerManager.WakeLock wl = mPowerManager.newWakeLock(
-                    PowerManager.ACQUIRE_CAUSES_WAKEUP | PowerManager.ON_AFTER_RELEASE | PowerManager.FULL_WAKE_LOCK,
-                    "incoming_call"
-                );
-                wl.acquire(10000);
-
-                if (mCalls.size() == 0) {
-                    mAudioManager.setSpeakerphoneOn(true);
-                }
-            }
+        }
         });
-        **/
+         **/
 
         // -----
         mCalls.add(call);
