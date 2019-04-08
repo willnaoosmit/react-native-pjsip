@@ -22,6 +22,7 @@ public class PjActions {
     public static final String TAG = "PjActions";
 
     public static final String ACTION_START = "start";
+    public static final String ACTION_STOP_SERVICE = "service_stop";
     public static final String ACTION_CREATE_ACCOUNT = "account_create";
     public static final String ACTION_CHANGE_CODEC_SETTINGS= "change_codec_settings'";
     public static final String ACTION_REGISTER_ACCOUNT = "account_register";
@@ -45,6 +46,7 @@ public class PjActions {
     public static final String ACTION_SET_SERVICE_CONFIGURATION = "set_service_configuration";
 
     public static final String EVENT_STARTED = "com.carusto.account.started";
+    public static final String EVENT_SERVICE_STOPPED = "com.carusto.service.stopped";
     public static final String EVENT_ACCOUNT_CREATED = "com.carusto.account.created";
     public static final String EVENT_REGISTRATION_CHANGED = "com.carusto.registration.changed";
     public static final String EVENT_CALL_CHANGED = "com.carusto.call.changed";
@@ -241,6 +243,7 @@ public class PjActions {
 
         return intent;
     }
+
     public static Intent createConferenceIntent(int callbackId, Context context) {
         Intent intent = new Intent(context, PjSipService.class);
         intent.setAction(PjActions.ACTION_CONFERENCE_CALL);
@@ -255,6 +258,13 @@ public class PjActions {
 
         formatIntent(intent, codecSettings);
 
+        return intent;
+    }
+
+    public static Intent createStopServiceIntent(Context context) {
+        Intent intent = new Intent(context, PjSipService.class);
+        intent.setAction(PjActions.ACTION_STOP_SERVICE);
+//        intent.putExtra("callback_id", callbackId);
         return intent;
     }
 

@@ -1,11 +1,19 @@
 package com.carusto.ReactNativePjSip;
 
+import android.annotation.SuppressLint;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.Service;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.media.AudioManager;
+import android.media.Ringtone;
+import android.media.RingtoneManager;
+import android.net.Uri;
 import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Handler;
@@ -15,8 +23,15 @@ import android.os.Looper;
 import android.os.PowerManager;
 import android.os.Process;
 import android.os.Bundle;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
+import android.support.annotation.NonNull;
+import android.support.v4.app.JobIntentService;
+import android.support.v4.app.NotificationCompat;
+import android.support.v4.media.session.MediaButtonReceiver;
 import android.telephony.TelephonyManager;
 import android.util.Log;
+import android.view.KeyEvent;
 
 import com.carusto.ReactNativePjSip.dto.AccountConfigurationDTO;
 import com.carusto.ReactNativePjSip.dto.CallSettingsDTO;
@@ -57,6 +72,7 @@ import org.pjsip.pjsua2.pjsip_transport_type_e;
 import org.pjsip.pjsua2.pjsua_call_media_status;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -66,6 +82,8 @@ public class PjSipService extends Service {
     private static String TAG = "PjSipService";
 
     private boolean mInitialized;
+
+    private boolean mNotificationRunning;
 
     private HandlerThread mWorkerThread;
 
@@ -116,6 +134,10 @@ public class PjSipService extends Service {
         return mEmitter;
     }
 
+    private Ringtone mRingtone;
+    private Vibrator mVibrator;
+    private boolean isRinging = false;
+
     @Override
     public IBinder onBind(Intent intent) {
         return null;
@@ -136,9 +158,18 @@ public class PjSipService extends Service {
             Log.e(TAG, "Error while loading PJSIP pjsua2 native library", error);
             throw new RuntimeException(error);
         }
+        try {
+            Uri ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
+            mRingtone = RingtoneManager.getRingtone(getApplicationContext(), ringtoneUri);
+            mVibrator = (Vibrator) getSystemService(VIBRATOR_SERVICE);
 
+        } catch (Exception e) {
+            Log.e(TAG, "Error while loading Ringtone", e);
+        }
         // Start stack
         try {
+
+
             mEndpoint = new Endpoint();
             mEndpoint.libCreate();
             mEndpoint.libRegisterThread(Thread.currentThread().getName());
@@ -216,7 +247,9 @@ public class PjSipService extends Service {
     @Override
     public int onStartCommand(final Intent intent, int flags, int startId) {
         if (!mInitialized) {
+            Log.d(TAG, "Starting Service");
             if (intent != null && intent.hasExtra("service")) {
+                Log.d(TAG, "Getting service config from map");
                 mServiceConfiguration = ServiceConfigurationDTO.fromMap((Map) intent.getSerializableExtra("service"));
             }
 
@@ -234,6 +267,7 @@ public class PjSipService extends Service {
             mGSMIdle = mTelephonyManager.getCallState() == TelephonyManager.CALL_STATE_IDLE;
 
             IntentFilter phoneStateFilter = new IntentFilter(TelephonyManager.ACTION_PHONE_STATE_CHANGED);
+            Log.d(TAG, "Registering PhoneStateChangedReceiver");
             registerReceiver(mPhoneStateChangedReceiver, phoneStateFilter);
 
             mInitialized = true;
@@ -255,12 +289,13 @@ public class PjSipService extends Service {
             });
         }
 
-        return START_NOT_STICKY;
+        return START_STICKY;
     }
 
     @Override
     public void onDestroy() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2 && mWorkerThread != null) {
+
             mWorkerThread.quitSafely();
         }
 
@@ -271,11 +306,16 @@ public class PjSipService extends Service {
         } catch (Exception e) {
             Log.w(TAG, "Failed to destroy PjSip library", e);
         }
+        try {
+            unregisterReceiver(mPhoneStateChangedReceiver);
+        } catch (Exception e) {
+            Log.w(TAG, "Error Unregistering PhoneStateChangedReceiver", e);
+        }
 
-        unregisterReceiver(mPhoneStateChangedReceiver);
-
+        Log.d(TAG, "Stopping service");
         super.onDestroy();
     }
+
 
     private void job(Runnable job) {
         mHandler.post(job);
@@ -338,6 +378,9 @@ public class PjSipService extends Service {
             // General actions
             case PjActions.ACTION_START:
                 handleStart(intent);
+                break;
+            case PjActions.ACTION_STOP_SERVICE:
+                handleStopService(intent);
                 break;
 
             // Account actions
@@ -416,6 +459,11 @@ public class PjSipService extends Service {
                 }
             }
 
+            if(!mNotificationRunning) {
+                createRunningNotification();
+
+            }
+
             CodecInfoVector codVect = mEndpoint.codecEnum();
             JSONObject codecs = new JSONObject();
 
@@ -434,6 +482,75 @@ public class PjSipService extends Service {
         } catch (Exception error) {
             Log.e(TAG, "Error while building codecs list", error);
             throw new RuntimeException(error);
+        }
+    }
+
+    private void handleStopService(Intent intent) {
+        stopSelf();
+        mEmitter.fireServiceStopped(intent);
+
+    }
+
+    @SuppressLint("MissingPermission")
+    public void ring(boolean shouldRing) {
+        if(shouldRing) {
+            mRingtone.play();
+
+            long[] pattern = { 0, 1000, 500 };
+            if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+
+                mVibrator.vibrate(VibrationEffect.createWaveform(pattern, 0));
+            } else {
+
+                mVibrator.vibrate(pattern, 0);
+            }
+        } else {
+            mRingtone.stop();
+            mVibrator.cancel();
+        }
+        isRinging = shouldRing;
+    }
+
+    @SuppressWarnings("unchecked")
+    private void createRunningNotification() {
+        try {
+            Log.w(TAG, "Creating notification");
+            Log.w(TAG, mServiceConfiguration.getNotificationsConfig().toString());
+            HashMap<String, Object> notificationConfig = (HashMap) mServiceConfiguration.getNotificationsConfig().get("account");
+            String ns = getApplicationContext().getPackageName();
+            String cls = ns + ".MainActivity";
+            int icon = getResources().getIdentifier(String.valueOf(notificationConfig.get("smallIcon")), "drawable",ns);
+
+            Intent notificationIntent = new Intent(this, Class.forName(cls));
+            PendingIntent openAppPendingIntent = PendingIntent.getActivity(this, 0,
+                    notificationIntent, 0);
+
+            Intent stopServiceIntent = PjActions.createStopServiceIntent(this);
+            PendingIntent stopServicePendingIntent = PendingIntent.getService(this, 0, stopServiceIntent, 0);
+
+            NotificationCompat.Builder notificationBuilder = new NotificationCompat.Builder(this, "")
+                    .setContentTitle(String.valueOf(notificationConfig.get("title")))
+                    .setContentText(String.valueOf(notificationConfig.get("text")))
+                    .setTicker(String.valueOf(notificationConfig.get("ticker")))
+                    .setSmallIcon(icon != 0 ? icon : R.drawable.redbox_top_border_background)
+                    .setPriority(NotificationCompat.PRIORITY_HIGH)
+                    .addAction(0, "Stop", stopServicePendingIntent)
+                    .setContentIntent(openAppPendingIntent);
+
+
+            if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+
+                NotificationChannel notificationChannel = new NotificationChannel("1111", "Main Channel", NotificationManager.IMPORTANCE_DEFAULT);
+                NotificationManager notificationManager = getSystemService(NotificationManager.class);
+                notificationManager.createNotificationChannel(notificationChannel);
+                notificationBuilder.setChannelId(notificationChannel.getId());
+            }
+            mNotificationRunning = true;
+
+            startForeground(1, notificationBuilder.build());
+
+        } catch (Exception e) {
+            Log.w(TAG, "Error starting foreground notification", e);
         }
     }
 
@@ -830,6 +947,35 @@ public class PjSipService extends Service {
         }
     }
 
+    @Override
+    public void onCreate() {
+
+        Log.d(TAG, "On Create Service");
+        KeyEvent.Callback cb = new KeyEvent.Callback(){
+            @Override
+            public boolean onKeyDown(int keyCode, KeyEvent event) {
+                return false;
+            }
+
+            @Override
+            public boolean onKeyLongPress(int keyCode, KeyEvent event) {
+                return false;
+            }
+
+            @Override
+            public boolean onKeyUp(int keyCode, KeyEvent event) {
+                return false;
+            }
+
+            @Override
+            public boolean onKeyMultiple(int keyCode, int count, KeyEvent event) {
+                return false;
+            }
+        };
+
+
+    }
+
     private void handleCallXFerReplaces(Intent intent) {
         try {
             int callId = intent.getIntExtra("call_id", -1);
@@ -974,48 +1120,60 @@ public class PjSipService extends Service {
             return;
         }
 
-        /**
+
+
          // Automatically start application when incoming call received.
-         if (mAppHidden) {
+
          try {
-         String ns = getApplicationContext().getPackageName();
-         String cls = ns + ".MainActivity";
+             String ns = getApplicationContext().getPackageName();
+             String cls = ns + ".MainActivity";
 
-         Intent intent = new Intent(getApplicationContext(), Class.forName(cls));
-         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.EXTRA_DOCK_STATE_CAR);
-         intent.addCategory(Intent.CATEGORY_LAUNCHER);
-         intent.putExtra("foreground", true);
+             Intent intent = new Intent(getApplicationContext(), Class.forName(cls));
+             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+             intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT );
+             intent.addCategory(Intent.CATEGORY_LAUNCHER);
+             intent.putExtra("foreground", true);
 
-         startActivity(intent);
+             startActivity(intent);
          } catch (Exception e) {
-         Log.w(TAG, "Failed to open application on received call", e);
+             Log.w(TAG, "Failed to open application on received call", e);
          }
+
+         //if there's a call present we won't make the phone ring
+         if(mCalls.size() <= 0) {
+             ring(true);
          }
 
          job(new Runnable() {
-        @Override
-        public void run() {
-        // Brighten screen at least 10 seconds
-        PowerManager.WakeLock wl = mPowerManager.newWakeLock(
-        PowerManager.ACQUIRE_CAUSES_WAKEUP | PowerManager.ON_AFTER_RELEASE | PowerManager.FULL_WAKE_LOCK,
-        "incoming_call"
-        );
-        wl.acquire(10000);
+            @Override
+            public void run() {
+                // Brighten screen at least 10 seconds
 
-        if (mCalls.size() == 0) {
-        mAudioManager.setSpeakerphoneOn(true);
-        }
-        }
+                PowerManager.WakeLock wl = mPowerManager.newWakeLock(
+                PowerManager.ACQUIRE_CAUSES_WAKEUP | PowerManager.ON_AFTER_RELEASE | PowerManager.FULL_WAKE_LOCK,
+                "pjsip:incoming_call"
+                );
+                wl.acquire(10000);
+
+                if (mCalls.size() == 0) {
+                    mAudioManager.setSpeakerphoneOn(true);
+                }
+            }
         });
-         **/
+
 
         // -----
+        Log.d(TAG, "Incoming Call Received");
         mCalls.add(call);
         mEmitter.fireCallReceivedEvent(call);
     }
 
     void emmitCallStateChanged(PjSipCall call, OnCallStateParam prm) {
         try {
+
+            if( isRinging && call.getInfo().getState() != pjsip_inv_state.PJSIP_INV_STATE_NULL && call.getInfo().getState() != pjsip_inv_state.PJSIP_INV_STATE_INCOMING ) {
+               ring(false);
+            }
             if (call.getInfo().getState() == pjsip_inv_state.PJSIP_INV_STATE_DISCONNECTED) {
                 emmitCallTerminated(call, prm);
             } else {
@@ -1036,7 +1194,7 @@ public class PjSipService extends Service {
                 public void run() {
                     // Acquire wake lock
                     if (mIncallWakeLock == null) {
-                        mIncallWakeLock = mPowerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "incall");
+                        mIncallWakeLock = mPowerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "pjsip:incall");
                     }
                     if (!mIncallWakeLock.isHeld()) {
                         mIncallWakeLock.acquire();
@@ -1096,6 +1254,10 @@ public class PjSipService extends Service {
         mEmitter.fireCallChanged(call);
     }
 
+
+
+
+
     /**
      * Pauses active calls once user answer to incoming calls.
      */
@@ -1125,6 +1287,8 @@ public class PjSipService extends Service {
             }
         }
     }
+
+
 
     protected class PhoneStateChangedReceiver extends BroadcastReceiver {
         @Override
