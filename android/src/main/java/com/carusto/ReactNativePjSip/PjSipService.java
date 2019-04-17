@@ -186,19 +186,18 @@ public class PjSipService extends Service {
             Uri uir = Uri.parse("android.resource://" + getPackageName() + "/raw/" + "ringback_tone");
             Log.d(TAG, "Ringback uri: " + uir.toString());
             ringbackPlayer.setDataSource(getApplicationContext(), uir);
-//            ringbackPlayer.setDataSource("https://upload.wikimedia.org/wikipedia/commons/c/cd/US_ringback_tone.ogg");
             ringbackPlayer.setLooping(true);
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 AudioAttributes attrs = new AudioAttributes.Builder()
                         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .setFlags(AudioAttributes.USAGE_VOICE_COMMUNICATION_SIGNALLING)
+                        .setFlags(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                        .setLegacyStreamType(AudioManager.STREAM_VOICE_CALL)
                         .build();
                 ringbackPlayer.setAudioAttributes( attrs);
             } else {
 
                 ringbackPlayer.setAudioStreamType(AudioManager.STREAM_VOICE_CALL);
             }
-
             ringbackPlayer.prepare();
         } catch (Exception e) {
             Log.e(TAG, "Error while loading RingBack tone", e);
@@ -553,9 +552,10 @@ public class PjSipService extends Service {
     public void ringBack( boolean shouldRingBack) {
 
         if(shouldRingBack) {
-
+            Log.w(TAG, "started Ring Back ");
             ringbackPlayer.start();
         }else if (ringbackPlayer.isPlaying()){
+            Log.w(TAG, "stopped Ring Back ");
             ringbackPlayer.pause();
             ringbackPlayer.seekTo(0);
         }
@@ -979,6 +979,7 @@ public class PjSipService extends Service {
 
             mEmitter.fireIntentHandled(intent);
         } catch (Exception e) {
+            Log.w(TAG, "Error setting audio manager to earpiece", e);
             mEmitter.fireIntentHandled(intent, e);
         }
     }
@@ -1230,12 +1231,17 @@ public class PjSipService extends Service {
         try {
             Log.w(TAG, "Call state updated: " + call.getInfo().getState());
 
-            if( !ringbackPlayer.isPlaying() && call.getInfo().getState() == pjsip_inv_state.PJSIP_INV_STATE_CALLING) {
-                ringBack(true);
+            //if the state is EARLY continue with the existing logic;
+            if( call.getInfo().getState() != pjsip_inv_state.PJSIP_INV_STATE_EARLY ) {
+                if( !ringbackPlayer.isPlaying() && call.getInfo().getState() == pjsip_inv_state.PJSIP_INV_STATE_CALLING  ) {
+                    ringBack(true);
+                }
+
+                if( ringbackPlayer.isPlaying() && call.getInfo().getState() != pjsip_inv_state.PJSIP_INV_STATE_CALLING) {
+                    ringBack(false);
+                }
             }
-            if( ringbackPlayer.isPlaying() && call.getInfo().getState() != pjsip_inv_state.PJSIP_INV_STATE_CALLING) {
-                ringBack(false);
-            }
+
             //if the phone is ringing and the call state updates to any state different from the ones below it should stop ringing.
             if( isRinging && call.getInfo().getState() != pjsip_inv_state.PJSIP_INV_STATE_NULL && call.getInfo().getState() != pjsip_inv_state.PJSIP_INV_STATE_INCOMING ) {
                 Log.w(TAG, "Ringing stopped due to state: " + call.getInfo().getState());
@@ -1307,8 +1313,13 @@ public class PjSipService extends Service {
 
                 // Reset audio settings
                 if (mCalls.size() == 1) {
-                    mAudioManager.setSpeakerphoneOn(false);
-                    mAudioManager.setMode(AudioManager.MODE_NORMAL);
+                    try {
+                        mAudioManager.setSpeakerphoneOn(false);
+                        mAudioManager.setMode(AudioManager.MODE_NORMAL);
+                    } catch (Exception e) {
+                        Log.w(TAG, "Error setting audio manager mode", e);
+                    }
+
                 }
             }
         });
