@@ -1,16 +1,20 @@
 package com.carusto.ReactNativePjSip;
 
 import android.annotation.SuppressLint;
+import android.app.KeyguardManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.BroadcastReceiver;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.media.AudioAttributes;
 import android.media.AudioManager;
+import android.media.MediaPlayer;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
 import android.net.Uri;
@@ -71,6 +75,8 @@ import org.pjsip.pjsua2.pjsip_status_code;
 import org.pjsip.pjsua2.pjsip_transport_type_e;
 import org.pjsip.pjsua2.pjsua_call_media_status;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -113,6 +119,8 @@ public class PjSipService extends Service {
     private List<Object> mTrash = new LinkedList<>();
 
     private AudioManager mAudioManager;
+
+    private MediaPlayer ringbackPlayer;
 
     private boolean mUseSpeaker = false;
 
@@ -159,12 +167,41 @@ public class PjSipService extends Service {
             throw new RuntimeException(error);
         }
         try {
+
+
+
             Uri ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
             mRingtone = RingtoneManager.getRingtone(getApplicationContext(), ringtoneUri);
             mVibrator = (Vibrator) getSystemService(VIBRATOR_SERVICE);
 
+
+
         } catch (Exception e) {
             Log.e(TAG, "Error while loading Ringtone", e);
+        }
+
+        try {
+            Log.d(TAG, "pack: " + getPackageName());
+            ringbackPlayer = new MediaPlayer();
+            Uri uir = Uri.parse("android.resource://" + getPackageName() + "/raw/" + "ringback_tone");
+            Log.d(TAG, "Ringback uri: " + uir.toString());
+            ringbackPlayer.setDataSource(getApplicationContext(), uir);
+//            ringbackPlayer.setDataSource("https://upload.wikimedia.org/wikipedia/commons/c/cd/US_ringback_tone.ogg");
+            ringbackPlayer.setLooping(true);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                AudioAttributes attrs = new AudioAttributes.Builder()
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .setFlags(AudioAttributes.USAGE_VOICE_COMMUNICATION_SIGNALLING)
+                        .build();
+                ringbackPlayer.setAudioAttributes( attrs);
+            } else {
+
+                ringbackPlayer.setAudioStreamType(AudioManager.STREAM_VOICE_CALL);
+            }
+
+            ringbackPlayer.prepare();
+        } catch (Exception e) {
+            Log.e(TAG, "Error while loading RingBack tone", e);
         }
         // Start stack
         try {
@@ -270,6 +307,7 @@ public class PjSipService extends Service {
             Log.d(TAG, "Registering PhoneStateChangedReceiver");
             registerReceiver(mPhoneStateChangedReceiver, phoneStateFilter);
 
+
             mInitialized = true;
 
             job(new Runnable() {
@@ -311,7 +349,8 @@ public class PjSipService extends Service {
         } catch (Exception e) {
             Log.w(TAG, "Error Unregistering PhoneStateChangedReceiver", e);
         }
-
+        ringbackPlayer.release();
+        ringbackPlayer = null;
         Log.d(TAG, "Stopping service");
         super.onDestroy();
     }
@@ -509,6 +548,17 @@ public class PjSipService extends Service {
             mVibrator.cancel();
         }
         isRinging = shouldRing;
+    }
+
+    public void ringBack( boolean shouldRingBack) {
+
+        if(shouldRingBack) {
+
+            ringbackPlayer.start();
+        }else if (ringbackPlayer.isPlaying()){
+            ringbackPlayer.pause();
+            ringbackPlayer.seekTo(0);
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -789,6 +839,7 @@ public class PjSipService extends Service {
 //            doPauseParallelCalls(call);
 
             mCalls.add(call);
+
             mEmitter.fireIntentHandled(intent, call.toJson());
         } catch (Exception e) {
             mEmitter.fireIntentHandled(intent, e);
@@ -1125,6 +1176,11 @@ public class PjSipService extends Service {
          // Automatically start application when incoming call received.
 
          try {
+
+//             CallOpParam prm = new CallOpParam();
+//             prm.setStatusCode(pjsip_status_code.PJSIP_SC_RINGING);
+//             call.answer(prm);
+
              String ns = getApplicationContext().getPackageName();
              String cls = ns + ".MainActivity";
 
@@ -1145,6 +1201,7 @@ public class PjSipService extends Service {
          }
 
          job(new Runnable() {
+            @SuppressLint("MissingPermission")
             @Override
             public void run() {
                 // Brighten screen at least 10 seconds
@@ -1157,6 +1214,7 @@ public class PjSipService extends Service {
 
                 if (mCalls.size() == 0) {
                     mAudioManager.setSpeakerphoneOn(true);
+
                 }
             }
         });
@@ -1170,9 +1228,18 @@ public class PjSipService extends Service {
 
     void emmitCallStateChanged(PjSipCall call, OnCallStateParam prm) {
         try {
+            Log.w(TAG, "Call state updated: " + call.getInfo().getState());
 
+            if( !ringbackPlayer.isPlaying() && call.getInfo().getState() == pjsip_inv_state.PJSIP_INV_STATE_CALLING) {
+                ringBack(true);
+            }
+            if( ringbackPlayer.isPlaying() && call.getInfo().getState() != pjsip_inv_state.PJSIP_INV_STATE_CALLING) {
+                ringBack(false);
+            }
+            //if the phone is ringing and the call state updates to any state different from the ones below it should stop ringing.
             if( isRinging && call.getInfo().getState() != pjsip_inv_state.PJSIP_INV_STATE_NULL && call.getInfo().getState() != pjsip_inv_state.PJSIP_INV_STATE_INCOMING ) {
-               ring(false);
+                Log.w(TAG, "Ringing stopped due to state: " + call.getInfo().getState());
+                ring(false);
             }
             if (call.getInfo().getState() == pjsip_inv_state.PJSIP_INV_STATE_DISCONNECTED) {
                 emmitCallTerminated(call, prm);
