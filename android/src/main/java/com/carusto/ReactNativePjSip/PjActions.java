@@ -37,6 +37,7 @@ public class PjActions {
     public static final String ACTION_UNMUTE_CALL = "call_unmute";
     public static final String ACTION_USE_SPEAKER_CALL = "call_use_speaker";
     public static final String ACTION_USE_EARPIECE_CALL = "call_use_earpiece";
+    public static final String ACTION_USE_BT_HEADSET_CALL = "call_use_bt_headset";
     public static final String ACTION_XFER_CALL = "call_xfer";
     public static final String ACTION_XFER_REPLACES_CALL = "call_xfer_replace";
     public static final String ACTION_REDIRECT_CALL = "call_redirect";
@@ -52,6 +53,7 @@ public class PjActions {
     public static final String EVENT_CALL_CHANGED = "com.carusto.call.changed";
     public static final String EVENT_CALL_TERMINATED = "com.carusto.call.terminated";
     public static final String EVENT_CALL_RECEIVED = "com.carusto.call.received";
+    public static final String EVENT_IN_CALL = "com.carusto.call.progress";
     public static final String EVENT_CALL_SCREEN_LOCKED = "com.carusto.call.screen.locked";
     public static final String EVENT_MESSAGE_RECEIVED = "com.carusto.message.received";
     public static final String EVENT_HANDLED = "com.carusto.handled";
@@ -189,6 +191,15 @@ public class PjActions {
     public static Intent createUseSpeakerCallIntent(int callbackId, int callId, Context context) {
         Intent intent = new Intent(context, PjSipService.class);
         intent.setAction(PjActions.ACTION_USE_SPEAKER_CALL);
+        intent.putExtra("callback_id", callbackId);
+        intent.putExtra("call_id", callId);
+
+        return intent;
+    }
+
+    public static Intent createBtHeadsetCallIntent(int callbackId, int callId, Context context) {
+        Intent intent = new Intent(context, PjSipService.class);
+        intent.setAction(PjActions.ACTION_USE_BT_HEADSET_CALL);
         intent.putExtra("callback_id", callbackId);
         intent.putExtra("call_id", callId);
 

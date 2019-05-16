@@ -7,12 +7,13 @@ import android.content.Intent;
 import android.os.Build;
 import android.util.Log;
 
+import com.carusto.ReactNativePjSip.Custom.BluetoothBroadcastReceiver;
 import com.facebook.react.bridge.*;
 
 public class PjSipModule extends ReactContextBaseJavaModule {
 
     private static PjSipBroadcastReceiver receiver;
-
+    public static BluetoothBroadcastReceiver btReceiver;
     public PjSipModule(ReactApplicationContext context) {
         super(context);
 
@@ -23,6 +24,15 @@ public class PjSipModule extends ReactContextBaseJavaModule {
         } else {
             receiver.setContext(context);
         }
+
+        if (btReceiver == null) {
+            btReceiver = new BluetoothBroadcastReceiver(context);
+
+        } else {
+            btReceiver.setContext(context);
+        }
+
+
     }
 
     @Override
@@ -136,6 +146,13 @@ public class PjSipModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
+    public void useBtHeadset(int callId, Callback callback) {
+        int callbackId = receiver.register(callback);
+        Intent intent = PjActions.createBtHeadsetCallIntent(callbackId, callId, getReactApplicationContext());
+        getReactApplicationContext().startService(intent);
+    }
+
+    @ReactMethod
     public void useEarpiece(int callId, Callback callback) {
         int callbackId = receiver.register(callback);
         Intent intent = PjActions.createUseEarpieceCallIntent(callbackId, callId, getReactApplicationContext());
@@ -182,5 +199,10 @@ public class PjSipModule extends ReactContextBaseJavaModule {
         int callbackId = receiver.register(callback);
         Intent intent = PjActions.createChangeCodecSettingsIntent(callbackId, codecSettings, getReactApplicationContext());
         getReactApplicationContext().startService(intent);
+    }
+
+    @ReactMethod
+    public void isBtHeadsetConnected(Callback callback) {
+        callback.invoke(true, btReceiver.isHeadsetConnected());
     }
 }

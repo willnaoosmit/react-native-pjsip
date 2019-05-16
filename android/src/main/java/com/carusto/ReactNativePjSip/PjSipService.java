@@ -17,6 +17,7 @@ import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
+import android.media.session.MediaSession;
 import android.net.Uri;
 import android.net.wifi.WifiManager;
 import android.os.Build;
@@ -27,12 +28,14 @@ import android.os.Looper;
 import android.os.PowerManager;
 import android.os.Process;
 import android.os.Bundle;
+import android.os.ResultReceiver;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.support.annotation.NonNull;
 import android.support.v4.app.JobIntentService;
 import android.support.v4.app.NotificationCompat;
 import android.support.v4.media.session.MediaButtonReceiver;
+import android.support.v4.media.session.MediaSessionCompat;
 import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.view.KeyEvent;
@@ -123,6 +126,7 @@ public class PjSipService extends Service {
     private MediaPlayer ringbackPlayer;
 
     private boolean mUseSpeaker = false;
+    private boolean mUseBtHeadset = false;
 
     private PowerManager mPowerManager;
 
@@ -145,6 +149,9 @@ public class PjSipService extends Service {
     private Ringtone mRingtone;
     private Vibrator mVibrator;
     private boolean isRinging = false;
+    private MediaSessionCompat mMediaSessionCompat;
+
+
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -318,6 +325,8 @@ public class PjSipService extends Service {
         }
 
         if (intent != null) {
+            Log.d(TAG, "Received intent: " + intent.getAction());
+//            MediaButtonReceiver.handleIntent(mMediaSessionCompat, intent);
             job(new Runnable() {
                 @Override
                 public void run() {
@@ -462,6 +471,9 @@ public class PjSipService extends Service {
                 break;
             case PjActions.ACTION_USE_EARPIECE_CALL:
                 handleCallUseEarpiece(intent);
+                break;
+            case PjActions.ACTION_USE_BT_HEADSET_CALL:
+                handleCallUseBtHeadset(intent);
                 break;
             case PjActions.ACTION_XFER_CALL:
                 handleCallXFer(intent);
@@ -958,6 +970,12 @@ public class PjSipService extends Service {
             mAudioManager.setSpeakerphoneOn(true);
             mUseSpeaker = true;
 
+            if(mAudioManager.isBluetoothScoOn()) {
+                mAudioManager.setBluetoothScoOn(false);
+                mAudioManager.stopBluetoothSco();
+                mUseBtHeadset = false;
+            }
+
             for (PjSipCall call : mCalls) {
                 emmitCallUpdated(call);
             }
@@ -968,10 +986,31 @@ public class PjSipService extends Service {
         }
     }
 
+    private void handleCallUseBtHeadset(Intent intent) {
+        try {
+            if(!mUseBtHeadset) {
+                mAudioManager.setBluetoothScoOn(true);
+                mAudioManager.startBluetoothSco();
+                mUseBtHeadset = true;
+                mEmitter.fireIntentHandled(intent);
+            }
+
+        } catch (Exception e) {
+            mEmitter.fireIntentHandled(intent, e);
+        }
+
+    }
+
     private void handleCallUseEarpiece(Intent intent) {
         try {
             mAudioManager.setSpeakerphoneOn(false);
             mUseSpeaker = false;
+
+            if(mAudioManager.isBluetoothScoOn()) {
+                mAudioManager.setBluetoothScoOn(false);
+                mAudioManager.stopBluetoothSco();
+                mUseBtHeadset = false;
+            }
 
             for (PjSipCall call : mCalls) {
                 emmitCallUpdated(call);
@@ -1003,27 +1042,23 @@ public class PjSipService extends Service {
     public void onCreate() {
 
         Log.d(TAG, "On Create Service");
-        KeyEvent.Callback cb = new KeyEvent.Callback(){
-            @Override
-            public boolean onKeyDown(int keyCode, KeyEvent event) {
-                return false;
-            }
-
-            @Override
-            public boolean onKeyLongPress(int keyCode, KeyEvent event) {
-                return false;
-            }
-
-            @Override
-            public boolean onKeyUp(int keyCode, KeyEvent event) {
-                return false;
-            }
-
-            @Override
-            public boolean onKeyMultiple(int keyCode, int count, KeyEvent event) {
-                return false;
-            }
-        };
+//        mMediaSessionCompat = new MediaSessionCompat(this, TAG);
+//        mMediaSessionCompat.setFlags(MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS | MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS);
+//
+//        mMediaSessionCompat.setCallback(new MediaSessionCompat.Callback() {
+//            @Override
+//            public void onCommand(String command, Bundle extras, ResultReceiver cb) {
+//                Log.d(TAG, "Command received: " + command);
+//                super.onCommand(command, extras, cb);
+//            }
+//
+//            @Override
+//            public boolean onMediaButtonEvent(Intent mediaButtonEvent) {
+//                Log.d(TAG, "mediaButtonEvent received: ");
+//                return super.onMediaButtonEvent(mediaButtonEvent);
+//            }
+//        });
+//        mMediaSessionCompat.setActive(true);
 
 
     }
@@ -1160,6 +1195,10 @@ public class PjSipService extends Service {
         getEmitter().fireMessageReceivedEvent(message);
     }
 
+    void emmitInCall( PjSipCall call) {
+        mEmitter.fireInCallEvent(call);
+    }
+
     void emmitCallReceived(PjSipAccount account, PjSipCall call) {
         // Automatically decline incoming call when user uses GSM
         if (!mGSMIdle) {
@@ -1246,6 +1285,7 @@ public class PjSipService extends Service {
             if( isRinging && call.getInfo().getState() != pjsip_inv_state.PJSIP_INV_STATE_NULL && call.getInfo().getState() != pjsip_inv_state.PJSIP_INV_STATE_INCOMING ) {
                 Log.w(TAG, "Ringing stopped due to state: " + call.getInfo().getState());
                 ring(false);
+
             }
             if (call.getInfo().getState() == pjsip_inv_state.PJSIP_INV_STATE_DISCONNECTED) {
                 emmitCallTerminated(call, prm);
@@ -1257,7 +1297,7 @@ public class PjSipService extends Service {
         }
     }
 
-    void emmitCallChanged(PjSipCall call, OnCallStateParam prm) {
+    void emmitCallChanged(final PjSipCall call, OnCallStateParam prm) {
         try {
             final int callId = call.getId();
             final pjsip_inv_state callState = call.getInfo().getState();
@@ -1281,8 +1321,12 @@ public class PjSipService extends Service {
                     // Acquire wifi lock
                     mWifiLock.acquire();
 
-                    if (callState == pjsip_inv_state.PJSIP_INV_STATE_EARLY || callState == pjsip_inv_state.PJSIP_INV_STATE_CONFIRMED) {
-                        mAudioManager.setMode(AudioManager.MODE_IN_CALL);
+                    if (callState == pjsip_inv_state.PJSIP_INV_STATE_EARLY || callState == pjsip_inv_state.PJSIP_INV_STATE_CONFIRMED || callState == pjsip_inv_state.PJSIP_INV_STATE_CALLING) {
+                        Log.d(TAG, "IN call");
+                        emmitInCall(call);
+
+                        mAudioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
+
                     }
                 }
             });
@@ -1314,8 +1358,14 @@ public class PjSipService extends Service {
                 // Reset audio settings
                 if (mCalls.size() == 1) {
                     try {
+
                         mAudioManager.setSpeakerphoneOn(false);
                         mAudioManager.setMode(AudioManager.MODE_NORMAL);
+                        if(mAudioManager.isBluetoothScoOn() || mUseBtHeadset) {
+                            mUseBtHeadset = false;
+                            mAudioManager.setBluetoothScoOn(false);
+                            mAudioManager.stopBluetoothSco();
+                        }
                     } catch (Exception e) {
                         Log.w(TAG, "Error setting audio manager mode", e);
                     }

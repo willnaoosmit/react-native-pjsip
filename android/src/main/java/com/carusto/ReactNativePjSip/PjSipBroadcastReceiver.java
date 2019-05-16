@@ -1,9 +1,11 @@
 package com.carusto.ReactNativePjSip;
 
+import android.app.Activity;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.media.AudioManager;
 import android.util.Log;
 import com.carusto.ReactNativePjSip.utils.ArgumentUtils;
 import com.facebook.react.bridge.Callback;
@@ -24,8 +26,11 @@ public class PjSipBroadcastReceiver extends BroadcastReceiver {
 
     private HashMap<Integer, Callback> callbacks = new HashMap<>();
 
+    private AudioManager audioManager;
+
     public PjSipBroadcastReceiver(ReactApplicationContext context) {
         this.context = context;
+        audioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
     }
 
     public void setContext(ReactApplicationContext context) {
@@ -45,12 +50,13 @@ public class PjSipBroadcastReceiver extends BroadcastReceiver {
         filter.addAction(PjActions.EVENT_ACCOUNT_CREATED);
         filter.addAction(PjActions.EVENT_REGISTRATION_CHANGED);
         filter.addAction(PjActions.EVENT_CALL_RECEIVED);
+        filter.addAction(PjActions.EVENT_IN_CALL);
         filter.addAction(PjActions.EVENT_CALL_CHANGED);
         filter.addAction(PjActions.EVENT_CALL_TERMINATED);
         filter.addAction(PjActions.EVENT_CALL_SCREEN_LOCKED);
         filter.addAction(PjActions.EVENT_MESSAGE_RECEIVED);
         filter.addAction(PjActions.EVENT_HANDLED);
-        filter.addAction("android.intent.action.MEDIA_BUTTON");
+//        filter.addAction("android.intent.action.MEDIA_BUTTON");
 
         return filter;
     }
@@ -80,6 +86,9 @@ public class PjSipBroadcastReceiver extends BroadcastReceiver {
             case PjActions.EVENT_CALL_RECEIVED:
                 onCallReceived(intent);
                 break;
+            case PjActions.EVENT_IN_CALL:
+                onInCall(intent);
+                break;
             case PjActions.EVENT_CALL_CHANGED:
                 onCallChanged(intent);
                 break;
@@ -106,9 +115,24 @@ public class PjSipBroadcastReceiver extends BroadcastReceiver {
     }
 
     private void onCallReceived(Intent intent) {
+        Activity mainActivity = context.getCurrentActivity();
+        if(mainActivity != null) {
+            Log.d(TAG, "onCallReceived");
+            mainActivity.setVolumeControlStream(AudioManager.STREAM_RING);
+        }
         String json = intent.getStringExtra("data");
         Object params = ArgumentUtils.fromJson(json);
         emit("pjSipCallReceived", params);
+    }
+
+    private void onInCall(Intent intent) {
+
+        Activity mainActivity = context.getCurrentActivity();
+        if(mainActivity != null) {
+            Log.d(TAG, "onInCall");
+            mainActivity.setVolumeControlStream(AudioManager.STREAM_VOICE_CALL);
+        }
+       //We just use this to change the audio stream
     }
 
     private void onCallChanged(Intent intent) {
@@ -118,6 +142,11 @@ public class PjSipBroadcastReceiver extends BroadcastReceiver {
     }
 
     private void onCallTerminated(Intent intent) {
+        Activity mainActivity = context.getCurrentActivity();
+        if(mainActivity != null) {
+            Log.d(TAG, "onCallTerminated");
+            mainActivity.setVolumeControlStream(AudioManager.USE_DEFAULT_STREAM_TYPE);
+        }
         String json = intent.getStringExtra("data");
         Object params = ArgumentUtils.fromJson(json);
         emit("pjSipCallTerminated", params);

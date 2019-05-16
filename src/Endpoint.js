@@ -60,6 +60,10 @@ export default class Endpoint extends EventEmitter {
         DeviceEventEmitter.addListener('pjSipCallScreenLocked', this._onCallScreenLocked.bind(this));
         DeviceEventEmitter.addListener('pjSipMessageReceived', this._onMessageReceived.bind(this));
         DeviceEventEmitter.addListener('pjSipConnectivityChanged', this._onConnectivityChanged.bind(this));
+
+        // Subscribe to Bluetooth Headset Events
+        DeviceEventEmitter.addListener('BtHeadsetConnected', this._onBtHeadsetConnected.bind(this));
+        DeviceEventEmitter.addListener('BtHeadsetDisconnected', this._onBtHeadsetDisconnected.bind(this));
     }
 
     /**
@@ -410,6 +414,22 @@ export default class Endpoint extends EventEmitter {
     }
 
     /**
+     * @param call {Call} Call instance
+     * @returns {Promise}
+     */
+    useBtHeadset(call) {
+        return new Promise((resolve, reject) => {
+            NativeModules.PjSipModule.useBtHeadset(call.getId(), (successful, data) => {
+                if (successful) {
+                    resolve(data);
+                } else {
+                    reject(data);
+                }
+            });
+        });
+    }
+
+    /**
      * Initiate call transfer to the specified address.
      * This function will send REFER request to instruct remote call party to initiate a new INVITE session to the specified destination/target.
      *
@@ -563,6 +583,18 @@ export default class Endpoint extends EventEmitter {
         });
     }
 
+    isBtHeadsetConnected() {
+        return new Promise( (resolve, reject) => {
+            NativeModules.PjSipModule.isBtHeadsetConnected((successful, isConnected) => {
+                if(successful) {
+                    resolve(isConnected);
+                } else {
+                    reject();
+                }
+            })
+        })
+    }
+
     /**
      * @fires Endpoint#connectivity_changed
      * @private
@@ -692,6 +724,14 @@ export default class Endpoint extends EventEmitter {
          * @property bool available True if connectivity matches current Network settings, otherwise false.
          */
         this.emit("connectivity_changed", available);
+    }
+
+    _onBtHeadsetConnected() {
+        this.emit('bt_headset_connected');
+    }
+
+    _onBtHeadsetDisconnected() {
+        this.emit('bt_headset_disconnected');
     }
 
     /**
