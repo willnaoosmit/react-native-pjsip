@@ -2,6 +2,7 @@ package com.carusto.ReactNativePjSip;
 
 import android.app.Activity;
 import android.app.Notification;
+import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
@@ -10,10 +11,14 @@ import android.util.Log;
 import com.carusto.ReactNativePjSip.Custom.BluetoothBroadcastReceiver;
 import com.facebook.react.bridge.*;
 
-public class PjSipModule extends ReactContextBaseJavaModule {
+public class PjSipModule extends ReactContextBaseJavaModule implements ActivityEventListener {
 
     private static PjSipBroadcastReceiver receiver;
     public static BluetoothBroadcastReceiver btReceiver;
+    private final int SILENT_MODE_PERMISSION_REQUEST_CODE = 1234;
+    //TODO: Change the way this is handled. Make use of the broadcast receiver;
+    private Callback requestSilentModePermissionCallBack;
+
     public PjSipModule(ReactApplicationContext context) {
         super(context);
 
@@ -31,6 +36,7 @@ public class PjSipModule extends ReactContextBaseJavaModule {
         } else {
             btReceiver.setContext(context);
         }
+        context.addActivityEventListener(this);
 
 
     }
@@ -60,6 +66,19 @@ public class PjSipModule extends ReactContextBaseJavaModule {
         Intent intent = PjActions.createSetServiceConfigurationIntent(id, configuration, getReactApplicationContext());
         getReactApplicationContext().startService(intent);
     }
+
+    @ReactMethod
+    public void requestSilentModePermission( Callback callback) {
+
+        requestSilentModePermissionCallBack = callback;
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.N){
+            Intent intent = new Intent(android.provider.Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS);
+            getCurrentActivity().startActivityForResult(intent, SILENT_MODE_PERMISSION_REQUEST_CODE);
+        }
+
+    }
+
+
 
     @ReactMethod
     public void createAccount(ReadableMap configuration, Callback callback) {
@@ -204,5 +223,30 @@ public class PjSipModule extends ReactContextBaseJavaModule {
     @ReactMethod
     public void isBtHeadsetConnected(Callback callback) {
         callback.invoke(true, btReceiver.isHeadsetConnected());
+    }
+
+    @Override
+    public void onActivityResult(Activity activity, int requestCode, int resultCode, Intent data) {
+        if(requestCode == SILENT_MODE_PERMISSION_REQUEST_CODE) {
+            Log.d("SILENT_MODE_PERMISSION", "Result Code: " + resultCode);
+            NotificationManager notificationManager = (NotificationManager) getReactApplicationContext().getSystemService(Context.NOTIFICATION_SERVICE);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && notificationManager != null) {
+                requestSilentModePermissionCallBack.invoke(true, notificationManager.isNotificationPolicyAccessGranted());
+            }
+            if(data != null && data.getExtras() != null) {
+                for(String s : data.getExtras().keySet()) {
+                    Log.d("SILENT_MODE_PERMISSION", "DATA: " + s);
+                }
+                Log.d("SILENT_MODE_PERMISSION", "EXTRA: " + data.getIntExtra("callback_id", -1));
+            }
+
+
+
+        }
+    }
+
+    @Override
+    public void onNewIntent(Intent intent) {
+
     }
 }

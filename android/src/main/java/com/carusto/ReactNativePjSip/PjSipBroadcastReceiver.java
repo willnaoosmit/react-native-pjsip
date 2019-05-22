@@ -56,6 +56,7 @@ public class PjSipBroadcastReceiver extends BroadcastReceiver {
         filter.addAction(PjActions.EVENT_CALL_SCREEN_LOCKED);
         filter.addAction(PjActions.EVENT_MESSAGE_RECEIVED);
         filter.addAction(PjActions.EVENT_HANDLED);
+
 //        filter.addAction("android.intent.action.MEDIA_BUTTON");
 
         return filter;

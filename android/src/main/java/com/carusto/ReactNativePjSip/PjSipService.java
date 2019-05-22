@@ -13,10 +13,12 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.media.AudioAttributes;
+import android.media.AudioFocusRequest;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
+import android.media.ToneGenerator;
 import android.media.session.MediaSession;
 import android.net.Uri;
 import android.net.wifi.WifiManager;
@@ -31,6 +33,7 @@ import android.os.Bundle;
 import android.os.ResultReceiver;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
+import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.v4.app.JobIntentService;
 import android.support.v4.app.NotificationCompat;
@@ -148,6 +151,7 @@ public class PjSipService extends Service {
 
     private Ringtone mRingtone;
     private Vibrator mVibrator;
+    private int phoneDefaultRingerMode;
     private boolean isRinging = false;
     private MediaSessionCompat mMediaSessionCompat;
 
@@ -308,10 +312,10 @@ public class PjSipService extends Service {
             mWifiLock.setReferenceCounted(false);
             mTelephonyManager = (TelephonyManager) getApplicationContext().getSystemService(Context.TELEPHONY_SERVICE);
             mGSMIdle = mTelephonyManager.getCallState() == TelephonyManager.CALL_STATE_IDLE;
-
             IntentFilter phoneStateFilter = new IntentFilter(TelephonyManager.ACTION_PHONE_STATE_CHANGED);
             Log.d(TAG, "Registering PhoneStateChangedReceiver");
             registerReceiver(mPhoneStateChangedReceiver, phoneStateFilter);
+
 
 
             mInitialized = true;
@@ -527,12 +531,24 @@ public class PjSipService extends Service {
 
             JSONObject settings = mServiceConfiguration.toJson();
             settings.put("codecs", codecs);
+            settings.put("canManageSilentMode", canManageSilentMode());
 
             mEmitter.fireStarted(intent, mAccounts, mCalls, settings);
         } catch (Exception error) {
             Log.e(TAG, "Error while building codecs list", error);
             throw new RuntimeException(error);
         }
+    }
+
+    private boolean canManageSilentMode() {
+        if(Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+            return true;
+        }
+
+        NotificationManager notificationManager = (NotificationManager) getApplicationContext()
+                .getSystemService(Context.NOTIFICATION_SERVICE);
+
+        return notificationManager != null && notificationManager.isNotificationPolicyAccessGranted();
     }
 
     private void handleStopService(Intent intent) {
@@ -618,7 +634,7 @@ public class PjSipService extends Service {
 
     private void handleSetServiceConfiguration(Intent intent) {
         try {
-            updateServiceConfiguration(ServiceConfigurationDTO.fromIntent(intent));
+            mServiceConfiguration.updateConfigurationFromIntent(intent);
 
             // Emmit response
             mEmitter.fireIntentHandled(intent, mServiceConfiguration.toJson());
@@ -1324,7 +1340,7 @@ public class PjSipService extends Service {
                     if (callState == pjsip_inv_state.PJSIP_INV_STATE_EARLY || callState == pjsip_inv_state.PJSIP_INV_STATE_CONFIRMED || callState == pjsip_inv_state.PJSIP_INV_STATE_CALLING) {
                         Log.d(TAG, "IN call");
                         emmitInCall(call);
-
+                        muteIncomingCalls();
                         mAudioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
 
                     }
@@ -1361,6 +1377,8 @@ public class PjSipService extends Service {
 
                         mAudioManager.setSpeakerphoneOn(false);
                         mAudioManager.setMode(AudioManager.MODE_NORMAL);
+                        unmuteIncomingCalls();
+
                         if(mAudioManager.isBluetoothScoOn() || mUseBtHeadset) {
                             mUseBtHeadset = false;
                             mAudioManager.setBluetoothScoOn(false);
@@ -1416,6 +1434,87 @@ public class PjSipService extends Service {
         }
     }
 
+    /**
+     * Pauses all calls, used when received GSM call.
+     */
+    private void doUnpauseAllCalls() {
+        for (PjSipCall call : mCalls) {
+            try {
+                call.unhold();
+            } catch (Exception e) {
+                Log.w(TAG, "Failed to put call on hold", e);
+            }
+        }
+    }
+
+
+    private void muteIncomingCalls() {
+        if(!mServiceConfiguration.isSilentModeEnabled() || !canManageSilentMode())
+            return;
+        try {
+            phoneDefaultRingerMode = Settings.System.getInt(getContentResolver(), Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 ?
+                    Settings.Global.MODE_RINGER : Settings.System.MODE_RINGER);
+            Log.d(TAG, "Default actual ringer mode: " + phoneDefaultRingerMode);
+            mAudioManager.setRingerMode(AudioManager.RINGER_MODE_SILENT);
+
+            Log.d(TAG, "Changing ringer mode to silent");
+        } catch (Settings.SettingNotFoundException e) {
+            e.printStackTrace();
+        } catch (Exception e) {
+            Log.w(TAG, e);
+        }
+
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            mAudioManager.adjustStreamVolume(AudioManager.STREAM_RING, AudioManager.ADJUST_MUTE,0);
+
+        } else {
+            mAudioManager.setStreamMute(AudioManager.STREAM_RING, true);
+        }
+    }
+
+    private void unmuteIncomingCalls() {
+        if(!mServiceConfiguration.isSilentModeEnabled() || !canManageSilentMode())
+            return;
+        //releaseAudioFocus();
+        try {
+            mAudioManager.setRingerMode(phoneDefaultRingerMode);
+            Log.d(TAG, "Changing ringer mode to normal");
+        } catch (Exception e) {
+            Log.w(TAG, e);
+        }
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            mAudioManager.adjustStreamVolume(AudioManager.STREAM_RING, AudioManager.ADJUST_UNMUTE,0);
+
+        } else {
+            mAudioManager.setStreamMute(AudioManager.STREAM_RING, false);
+        }
+    }
+
+    private AudioManager.OnAudioFocusChangeListener focusChangeListener = new AudioManager.OnAudioFocusChangeListener() {
+        @Override
+        public void onAudioFocusChange(int focusChange) {
+
+        }
+    };
+
+    private void requestAudioFocus() {
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            mAudioManager.requestAudioFocus(
+                    new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
+                            .setOnAudioFocusChangeListener(focusChangeListener)
+                            .build()
+            );
+        } else {
+            mAudioManager.requestAudioFocus(focusChangeListener, AudioManager.STREAM_NOTIFICATION, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT);
+        }
+
+
+
+    }
+
+    private void releaseAudioFocus() {
+        mAudioManager.abandonAudioFocus(focusChangeListener);
+    }
 
 
     protected class PhoneStateChangedReceiver extends BroadcastReceiver {
@@ -1423,7 +1522,7 @@ public class PjSipService extends Service {
         public void onReceive(Context context, Intent intent) {
             final String extraState = intent.getStringExtra(TelephonyManager.EXTRA_STATE);
 
-            if (TelephonyManager.EXTRA_STATE_RINGING.equals(extraState) || TelephonyManager.EXTRA_STATE_OFFHOOK.equals(extraState)) {
+            if ( TelephonyManager.EXTRA_STATE_OFFHOOK.equals(extraState)) {
                 Log.d(TAG, "GSM call received, pause all SIP calls and do not accept incoming SIP calls.");
 
                 mGSMIdle = false;
@@ -1437,6 +1536,16 @@ public class PjSipService extends Service {
             } else if (TelephonyManager.EXTRA_STATE_IDLE.equals(extraState)) {
                 Log.d(TAG, "GSM call released, allow to accept incoming calls.");
                 mGSMIdle = true;
+                job(new Runnable() {
+                    @Override
+                    public void run() {
+                        doUnpauseAllCalls();
+                    }
+                });
+            } else if (TelephonyManager.EXTRA_STATE_RINGING.equals(extraState)) {
+                ToneGenerator toneGen1 = new ToneGenerator(AudioManager.STREAM_VOICE_CALL, 100);
+                toneGen1.startTone(ToneGenerator.TONE_PROP_BEEP2);
+                Log.d(TAG, "GSM call ringing, tone played");
             }
         }
     }

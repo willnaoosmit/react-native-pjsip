@@ -595,6 +595,17 @@ export default class Endpoint extends EventEmitter {
         })
     }
 
+    requestSilentModePermission() {
+        return new Promise( (resolve, reject) => {
+            NativeModules.PjSipModule.requestSilentModePermission( (successful, wasEnabled ) => {
+                if(successful)
+                    resolve(wasEnabled);
+                else 
+                    reject();
+            });
+        })
+    }
+
     /**
      * @fires Endpoint#connectivity_changed
      * @private

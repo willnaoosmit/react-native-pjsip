@@ -45,6 +45,7 @@ public class PjActions {
     public static final String ACTION_CONFERENCE_CALL = "call_conference";
 
     public static final String ACTION_SET_SERVICE_CONFIGURATION = "set_service_configuration";
+    public static final String ACTION_REQUEST_SILENT_MODE_PERMISSION = "request_silent_mode_permission";
 
     public static final String EVENT_STARTED = "com.carusto.account.started";
     public static final String EVENT_SERVICE_STOPPED = "com.carusto.service.stopped";

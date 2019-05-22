@@ -16,6 +16,7 @@ public class ServiceConfigurationDTO {
     public String ua;
     public ArrayList<String> stun;
     private HashMap<String, Object> notificationsConfig;
+    private boolean enableSilentMode;
 
     public String getUserAgent() {
         return ua;
@@ -37,6 +38,14 @@ public class ServiceConfigurationDTO {
         this.notificationsConfig = notificationsConfig;
     }
 
+    public boolean isSilentModeEnabled() {
+        return enableSilentMode;
+    }
+
+    public void setSilentModeEnabled( boolean enabled) {
+        this.enableSilentMode = enabled;
+    }
+
     public boolean isUserAgentNotEmpty() {
         return ua != null && !ua.isEmpty();
     }
@@ -51,6 +60,7 @@ public class ServiceConfigurationDTO {
         try {
             json.put("ua", ua);
             json.put("notifications", notificationsConfig);
+            json.put("enableSilentMode", enableSilentMode);
 
             return json;
         } catch (Exception e) {
@@ -71,6 +81,9 @@ public class ServiceConfigurationDTO {
             Log.d("SERVICE_MAP", c.getNotificationsConfig().toString());
         }
 
+        if(intent.hasExtra("enableSilentMode")) {
+            c.enableSilentMode = intent.getBooleanExtra("enableSilentMode", false);
+        }
         return c;
     }
 
@@ -91,6 +104,10 @@ public class ServiceConfigurationDTO {
             c.setNotificationsConfig(  (HashMap<String, Object>) conf.get("notifications"));
         }
 
+        if (conf.containsKey("enableSilentMode")) {
+            c.enableSilentMode = (boolean) conf.get("enableSilentMode");
+        }
+
         return c;
     }
 
@@ -102,6 +119,22 @@ public class ServiceConfigurationDTO {
         }
 
         return c;
+    }
+
+    public void updateConfigurationFromIntent(Intent intent) {
+        if (intent.hasExtra("ua")) {
+            this.ua = intent.getStringExtra("ua");
+        }
+
+        if(intent.hasExtra("notifications")) {
+
+            this.setNotificationsConfig( new HashMap<>((Map<String, Object>)intent.getSerializableExtra("notifications")) );
+
+        }
+
+        if(intent.hasExtra("enableSilentMode")) {
+            this.enableSilentMode = intent.getBooleanExtra("enableSilentMode", false);
+        }
     }
 
     @Override
