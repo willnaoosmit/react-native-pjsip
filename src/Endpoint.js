@@ -1,4 +1,4 @@
-import React, {DeviceEventEmitter, NativeModules} from 'react-native';
+import React, {DeviceEventEmitter, NativeModules, Platform} from 'react-native';
 import {EventEmitter} from 'events'
 
 import Call from './Call'
@@ -584,6 +584,7 @@ export default class Endpoint extends EventEmitter {
     }
 
     isBtHeadsetConnected() {
+        if(Platform.OS === 'ios') return false;
         return new Promise( (resolve, reject) => {
             NativeModules.PjSipModule.isBtHeadsetConnected((successful, isConnected) => {
                 if(successful) {
@@ -596,6 +597,7 @@ export default class Endpoint extends EventEmitter {
     }
 
     requestSilentModePermission() {
+        if (Platform.OS === 'ios') return false;
         return new Promise( (resolve, reject) => {
             NativeModules.PjSipModule.requestSilentModePermission( (successful, wasEnabled ) => {
                 if(successful)
