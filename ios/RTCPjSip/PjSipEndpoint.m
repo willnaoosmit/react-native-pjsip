@@ -381,7 +381,7 @@ static void onCallReceived(pjsua_acc_id accId, pjsua_call_id callId, pjsip_rx_da
     
     PjSipCall *call = [PjSipCall itemConfig:callId];
     endpoint.calls[@(callId)] = call;
-    
+    pjsua_call_answer(callId, 180, NULL, NULL);
     [endpoint emmitCallReceived:call];
 }
 
