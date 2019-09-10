@@ -34,10 +34,10 @@ import android.os.ResultReceiver;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.provider.Settings;
-import android.support.annotation.NonNull;
-import android.support.v4.app.JobIntentService;
-import android.support.v4.app.NotificationCompat;
-import android.support.v4.media.session.MediaButtonReceiver;
+import androidx.annotation.NonNull;
+import androidx.core.app.JobIntentService;
+import androidx.core.app.NotificationCompat;
+import androidx.media.session.MediaButtonReceiver;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.telephony.TelephonyManager;
 import android.util.Log;
@@ -892,10 +892,10 @@ public class PjSipService extends Service {
 
             // -----
             PjSipCall call = findCall(callId);
-            CallOpParam prm = new CallOpParam(true);
-            prm.setStatusCode(pjsip_status_code.PJSIP_SC_DECLINE);
+            CallOpParam prm = new CallOpParam();
+            prm.setStatusCode(pjsip_status_code.PJSIP_SC_REQUEST_TERMINATED );
             call.hangup(prm);
-            prm.delete();
+
 
             mEmitter.fireIntentHandled(intent);
         } catch (Exception e) {
@@ -1278,6 +1278,13 @@ public class PjSipService extends Service {
 
         // -----
         Log.d(TAG, "Incoming Call Received");
+
+        try {
+            Log.d(TAG, "Incoming Call Received: sending ringing");
+            call.setRinging();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         mCalls.add(call);
         mEmitter.fireCallReceivedEvent(call);
     }
@@ -1298,7 +1305,7 @@ public class PjSipService extends Service {
             }
 
             //if the phone is ringing and the call state updates to any state different from the ones below it should stop ringing.
-            if( isRinging && call.getInfo().getState() != pjsip_inv_state.PJSIP_INV_STATE_NULL && call.getInfo().getState() != pjsip_inv_state.PJSIP_INV_STATE_INCOMING ) {
+            if( isRinging && call.getInfo().getState() != pjsip_inv_state.PJSIP_INV_STATE_NULL && call.getInfo().getState() != pjsip_inv_state.PJSIP_INV_STATE_INCOMING  &&  call.getInfo().getState() != pjsip_inv_state.PJSIP_INV_STATE_EARLY) {
                 Log.w(TAG, "Ringing stopped due to state: " + call.getInfo().getState());
                 ring(false);
 
