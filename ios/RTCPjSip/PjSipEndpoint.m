@@ -9,8 +9,10 @@
 #import "PjSipUtil.h"
 #import "PjSipEndpoint.h"
 #import "PjSipMessage.h"
+#import "AudioHelper.h"
 
 @implementation PjSipEndpoint
+
 
 + (instancetype) instance {
     static PjSipEndpoint *sharedInstance = nil;
@@ -142,8 +144,55 @@
     // Initialization is done, now start pjsua
     status = pjsua_start();
     if (status != PJ_SUCCESS) NSLog(@"Error starting pjsua");
+    [self checkBluetoothState: false];
+    [self initAudioNotifications];
     
     return self;
+}
+
+- (void) initAudioNotifications {
+    NSLog(@"Moises: Audio notifications init");
+    
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(audioHardwareRouteChanged:) name:AVAudioSessionRouteChangeNotification object:nil];
+}
+
+- (void) checkBluetoothState: (bool) emmitStatus {
+    
+    BOOL bluetoothPresent = false;
+    NSArray *arrayAudioPorts  = [AVAudioSession sharedInstance].availableInputs;
+    for (AVAudioSessionPortDescription *port in arrayAudioPorts)
+    {
+        if([[AudioHelper bluetoothRoutes] containsObject:port.portType]) {
+            bluetoothPresent = true;
+            break;
+        }
+       
+    }
+    
+    AVAudioSessionRouteDescription *currentRoute = [AVAudioSession sharedInstance].currentRoute;
+    if (!bluetoothPresent && currentRoute && currentRoute.outputs.count > 0) {
+        
+        NSString *portType = currentRoute.outputs[0].portType;
+        bluetoothPresent = [[AudioHelper bluetoothRoutes] containsObject:portType];
+    }
+    
+    if(emmitStatus) {
+        if(!self.bluetoothAvailable && bluetoothPresent) {
+            //trigger bt available
+            self.bluetoothAvailable = true;
+            [self emmitBluetoothConnectionChanged:true];
+            
+        } else if ( self.bluetoothAvailable && !bluetoothPresent) {
+            self.bluetoothAvailable = false;
+            [self emmitBluetoothConnectionChanged:false];
+        }
+    }
+}
+
+- (void)audioHardwareRouteChanged:(NSNotification *)notification {
+    // Your tests on the Audio Output changes will go here
+    [self checkBluetoothState: true];
+
 }
 
 - (NSDictionary *)start: (NSDictionary *)config {
@@ -265,12 +314,32 @@
     }
 }
 
+-(void)useBtHeadset {
+    NSError *err;
+    self.isSpeaker = false;
+    
+    AVAudioSessionPortDescription *_bluetoothPort = [AudioHelper bluetoothAudioDevice];
+    [[AVAudioSession sharedInstance] setPreferredInput:_bluetoothPort error:&err];
+    
+    if (err) {
+        NSLog(@"MOises: Failed to change audio route: err %@", err.localizedDescription);
+        err = nil;
+    }
+    for (NSString *key in self.calls) {
+        PjSipCall *call = self.calls[key];
+        [self emmitCallChanged:call];
+    }
+}
+
 -(void)useSpeaker {
     self.isSpeaker = true;
-    
-    AVAudioSession *audioSession = [AVAudioSession sharedInstance];
-    [audioSession overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker error:nil];
-    
+    NSError *err;
+    [[AVAudioSession sharedInstance] overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker error:&err];
+    if (err) {
+        NSLog(@"MOises: Failed to change audio route: err %@", err.localizedDescription);
+        err = nil;
+    }
+
     for (NSString *key in self.calls) {
         PjSipCall *call = self.calls[key];
         [self emmitCallChanged:call];
@@ -279,10 +348,16 @@
 
 -(void)useEarpiece {
     self.isSpeaker = false;
+
+    NSError *err;
+
+    AVAudioSessionPortDescription *builtinPort = [AudioHelper builtinAudioDevice];
+    [[AVAudioSession sharedInstance] setPreferredInput:builtinPort error:&err];
     
-    AVAudioSession *audioSession = [AVAudioSession sharedInstance];
-    [audioSession overrideOutputAudioPort:AVAudioSessionPortOverrideNone error:nil];
-    
+    if (err) {
+        NSLog(@"MOises: Failed to change audio route: err %@", err.localizedDescription);
+        err = nil;
+    }
     for (NSString *key in self.calls) {
         PjSipCall *call = self.calls[key];
         [self emmitCallChanged:call];
@@ -360,9 +435,16 @@
     [self emmitEvent:@"pjSipMessageReceived" body:[message toJsonDictionary]];
 }
 
+-(void)emmitBluetoothConnectionChanged:(Boolean) available {
+    [self emmitEvent:@"pjSipBluetoothConnectionChanged" body:@(available)];
+    
+}
+
 -(void)emmitEvent:(NSString*) name body:(id)body {
     [[self.bridge eventDispatcher] sendAppEventWithName:name body:body];
 }
+
+
 
 
 #pragma mark - Callbacks

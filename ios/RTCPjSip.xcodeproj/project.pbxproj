@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		166DB575233BB8B1008C0D0D /* AudioHelper.m in Sources */ = {isa = PBXBuildFile; fileRef = 166DB574233BB8B1008C0D0D /* AudioHelper.m */; };
 		A61DD9FB1E66BE9300278F2D /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A61DD9FA1E66BE9300278F2D /* AVFoundation.framework */; };
 		A6259A861E69889E0089146B /* PjSipMessage.m in Sources */ = {isa = PBXBuildFile; fileRef = A6259A851E69889E0089146B /* PjSipMessage.m */; };
 		A6D3BE311E6845AF00949DCF /* VialerPJSIP in Frameworks */ = {isa = PBXBuildFile; fileRef = A6D3BE301E6845AF00949DCF /* VialerPJSIP */; };
@@ -35,6 +36,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		166DB574233BB8B1008C0D0D /* AudioHelper.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AudioHelper.m; sourceTree = "<group>"; };
+		166DB576233BBB41008C0D0D /* AudioHelper.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AudioHelper.h; sourceTree = "<group>"; };
 		A61DD9FA1E66BE9300278F2D /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 		A6259A821E6988470089146B /* PjSipMessage.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PjSipMessage.h; sourceTree = "<group>"; };
 		A6259A851E69889E0089146B /* PjSipMessage.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = PjSipMessage.m; sourceTree = "<group>"; };
@@ -107,6 +110,8 @@
 				DD8F1BDD1F5895D900714D48 /* PjSipRemoteVideoViewManager.m */,
 				DD8F1BDF1F58974100714D48 /* PjSipPreviewVideoViewManager.h */,
 				DD8F1BE01F58974C00714D48 /* PjSipPreviewVideoViewManager.m */,
+				166DB574233BB8B1008C0D0D /* AudioHelper.m */,
+				166DB576233BBB41008C0D0D /* AudioHelper.h */,
 			);
 			path = RTCPjSip;
 			sourceTree = "<group>";
@@ -168,6 +173,7 @@
 			developmentRegion = English;
 			hasScannedForEncodings = 0;
 			knownRegions = (
+				English,
 				en,
 			);
 			mainGroup = DDFF87491D79D6F50096A8BE;
@@ -189,6 +195,7 @@
 				A6259A861E69889E0089146B /* PjSipMessage.m in Sources */,
 				A6F413A11E38CE9600340CC2 /* PjSipCall.m in Sources */,
 				A6F413A31E38CE9600340CC2 /* PjSipEndpoint.m in Sources */,
+				166DB575233BB8B1008C0D0D /* AudioHelper.m in Sources */,
 				A6F413A41E38CE9600340CC2 /* PjSipModule.m in Sources */,
 				A6F413A01E38CE9600340CC2 /* PjSipAccount.m in Sources */,
 				DD8F1BDE1F5895D900714D48 /* PjSipRemoteVideoViewManager.m in Sources */,

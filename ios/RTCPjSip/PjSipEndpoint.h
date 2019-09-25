@@ -16,6 +16,8 @@
 @property pjsua_transport_id tlsTransportId;
 
 @property bool isSpeaker;
+@property bool isBluetooth;
+@property bool bluetoothAvailable;
 
 +(instancetype)instance;
 
@@ -29,6 +31,7 @@
 -(PjSipCall *)makeCall:(PjSipAccount *) account destination:(NSString *)destination callSettings: (NSDictionary *)callSettings msgData: (NSDictionary *)msgData;
 -(void)pauseParallelCalls:(PjSipCall*) call; // TODO: Remove this feature.
 -(PjSipCall *)findCall:(int)callId;
+-(void)useBtHeadset;
 -(void)useSpeaker;
 -(void)useEarpiece;
 

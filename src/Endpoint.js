@@ -62,6 +62,7 @@ export default class Endpoint extends EventEmitter {
         DeviceEventEmitter.addListener('pjSipConnectivityChanged', this._onConnectivityChanged.bind(this));
 
         // Subscribe to Bluetooth Headset Events
+        DeviceEventEmitter.addListener('pjSipBluetoothConnectionChanged', this._onBluetoothConnectionChanged.bind(this));
         DeviceEventEmitter.addListener('BtHeadsetConnected', this._onBtHeadsetConnected.bind(this));
         DeviceEventEmitter.addListener('BtHeadsetDisconnected', this._onBtHeadsetDisconnected.bind(this));
     }
@@ -584,7 +585,7 @@ export default class Endpoint extends EventEmitter {
     }
 
     isBtHeadsetConnected() {
-        if(Platform.OS === 'ios') return false;
+        
         return new Promise( (resolve, reject) => {
             NativeModules.PjSipModule.isBtHeadsetConnected((successful, isConnected) => {
                 if(successful) {
@@ -739,6 +740,10 @@ export default class Endpoint extends EventEmitter {
         this.emit("connectivity_changed", available);
     }
 
+    _onBluetoothConnectionChanged(available) {
+        console.log('MOises', 'BT connectivity changed', )
+        this.emit('bt_connection_changed', available);
+    }
     _onBtHeadsetConnected() {
         this.emit('bt_headset_connected');
     }

@@ -225,6 +225,14 @@ RCT_EXPORT_METHOD(dtmfCall: (int) callId digits: (NSString *) digits callback:(R
     }
 }
 
+RCT_EXPORT_METHOD(isBtHeadsetConnected: (RCTResponseSenderBlock) callback) {
+    callback(@[@TRUE, @([PjSipEndpoint instance].bluetoothAvailable)]);
+}
+
+RCT_EXPORT_METHOD(useBtHeadset: (int) callId callback:(RCTResponseSenderBlock) callback) {
+    [[PjSipEndpoint instance] useBtHeadset];
+}
+
 RCT_EXPORT_METHOD(useSpeaker: (int) callId callback:(RCTResponseSenderBlock) callback) {
     [[PjSipEndpoint instance] useSpeaker];
 }
