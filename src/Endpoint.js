@@ -545,6 +545,7 @@ export default class Endpoint extends EventEmitter {
     }
 
     deactivateAudioSession() {
+        if (Platform.OS === 'android') return;
         return new Promise((resolve, reject) => {
             NativeModules.PjSipModule.deactivateAudioSession((successful, data) => {
                 if (successful) {

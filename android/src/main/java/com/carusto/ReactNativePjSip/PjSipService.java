@@ -204,9 +204,10 @@ public class PjSipService extends Service {
                         .setFlags(AudioAttributes.USAGE_VOICE_COMMUNICATION)
                         .setLegacyStreamType(AudioManager.STREAM_VOICE_CALL)
                         .build();
+                Log.d(TAG, "Ringback setting setAudioStreamType: STREAM_VOICE_CALL NEW");
                 ringbackPlayer.setAudioAttributes( attrs);
             } else {
-
+                Log.d(TAG, "Ringback setting setAudioStreamType: STREAM_VOICE_CALL OLD");
                 ringbackPlayer.setAudioStreamType(AudioManager.STREAM_VOICE_CALL);
             }
             ringbackPlayer.prepare();
@@ -1251,7 +1252,7 @@ public class PjSipService extends Service {
              Log.w(TAG, "Failed to open application on received call", e);
          }
 
-         //if there's a call present we won't make the phone ring
+         //if there aren't any calls present we should ring
          if(mCalls.size() <= 0) {
              ring(true);
          }
@@ -1362,28 +1363,30 @@ public class PjSipService extends Service {
 
     void emmitCallTerminated(PjSipCall call, OnCallStateParam prm) {
         final int callId = call.getId();
-
+        Log.d(TAG, "ring emmitCallTerminated: " + mCalls.size());
         job(new Runnable() {
             @Override
             public void run() {
                 // Release wake lock
-                if (mCalls.size() == 1) {
+                if (mCalls.size() <= 1) {
                     if (mIncallWakeLock != null && mIncallWakeLock.isHeld()) {
                         mIncallWakeLock.release();
                     }
                 }
 
                 // Release wifi lock
-                if (mCalls.size() == 1) {
+                if (mCalls.size() <= 1) {
                     mWifiLock.release();
                 }
 
                 // Reset audio settings
-                if (mCalls.size() == 1) {
+                Log.d(TAG, "ring emmitCallTerminated: Job: " + mCalls.size());
+                if (mCalls.size() <= 1) {
                     try {
 
                         mAudioManager.setSpeakerphoneOn(false);
                         mAudioManager.setMode(AudioManager.MODE_NORMAL);
+                        Log.d(TAG, "Ring  audio manager mode Normal");
                         unmuteIncomingCalls();
 
                         if(mAudioManager.isBluetoothScoOn() || mUseBtHeadset) {
