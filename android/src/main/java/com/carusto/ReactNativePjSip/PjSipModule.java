@@ -225,6 +225,21 @@ public class PjSipModule extends ReactContextBaseJavaModule implements ActivityE
         callback.invoke(true, btReceiver.isHeadsetConnected());
     }
 
+    @ReactMethod
+    public void activateAudioSession(Callback callback) {
+        int callbackId = receiver.register(callback);
+        Intent intent = PjActions.createActivateAudioSessionIntent(callbackId, getReactApplicationContext());
+        getReactApplicationContext().startService(intent);
+    }
+
+    @ReactMethod
+    public void deactivateAudioSession(Callback callback) {
+        int callbackId = receiver.register(callback);
+        Intent intent = PjActions.createDeactivateAudioSessionIntent(callbackId, getReactApplicationContext());
+        getReactApplicationContext().startService(intent);
+    }
+
+
     @Override
     public void onActivityResult(Activity activity, int requestCode, int resultCode, Intent data) {
         if(requestCode == SILENT_MODE_PERMISSION_REQUEST_CODE) {

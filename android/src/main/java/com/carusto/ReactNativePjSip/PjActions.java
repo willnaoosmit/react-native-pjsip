@@ -47,6 +47,9 @@ public class PjActions {
     public static final String ACTION_SET_SERVICE_CONFIGURATION = "set_service_configuration";
     public static final String ACTION_REQUEST_SILENT_MODE_PERMISSION = "request_silent_mode_permission";
 
+    public static final String ACTIVATE_AUDIO_SESSION = "activate_audio_session'";
+    public static final String DEACTIVATE_AUDIO_SESSION = "deactivate_audio_session'";
+
     public static final String EVENT_STARTED = "com.carusto.account.started";
     public static final String EVENT_SERVICE_STOPPED = "com.carusto.service.stopped";
     public static final String EVENT_ACCOUNT_CREATED = "com.carusto.account.created";
@@ -269,6 +272,24 @@ public class PjActions {
         intent.putExtra("callback_id", callbackId);
 
         formatIntent(intent, codecSettings);
+
+        return intent;
+    }
+
+    public static Intent createActivateAudioSessionIntent(int callbackId, Context context) {
+        Intent intent = new Intent(context, PjSipService.class);
+        intent.setAction(PjActions.ACTIVATE_AUDIO_SESSION);
+        intent.putExtra("callback_id", callbackId);
+
+
+        return intent;
+    }
+
+    public static Intent createDeactivateAudioSessionIntent(int callbackId, Context context) {
+        Intent intent = new Intent(context, PjSipService.class);
+        intent.setAction(PjActions.DEACTIVATE_AUDIO_SESSION);
+        intent.putExtra("callback_id", callbackId);
+
 
         return intent;
     }

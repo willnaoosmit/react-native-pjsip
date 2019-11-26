@@ -89,7 +89,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-public class PjSipService extends Service {
+public class PjSipService extends Service implements AudioManager.OnAudioFocusChangeListener {
 
     private static String TAG = "PjSipService";
 
@@ -125,6 +125,8 @@ public class PjSipService extends Service {
     private List<Object> mTrash = new LinkedList<>();
 
     private AudioManager mAudioManager;
+    private AudioAttributes callAudioAttributes;
+    private AudioFocusRequest callAudioFocusRequest;
 
     private MediaPlayer ringbackPlayer;
 
@@ -317,6 +319,24 @@ public class PjSipService extends Service {
             Log.d(TAG, "Registering PhoneStateChangedReceiver");
             registerReceiver(mPhoneStateChangedReceiver, phoneStateFilter);
 
+            if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                callAudioAttributes = new AudioAttributes.Builder()
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                        .build();
+            }
+
+            if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                callAudioFocusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                        .setAudioAttributes(callAudioAttributes)
+                        .setAcceptsDelayedFocusGain(false)
+                        .setWillPauseWhenDucked(false)
+                        .setOnAudioFocusChangeListener(this)
+                        .build();
+            }
+
+
+
 
 
             mInitialized = true;
@@ -493,6 +513,12 @@ public class PjSipService extends Service {
                 handleCallDtmf(intent);
             case PjActions.ACTION_CONFERENCE_CALL:
                 handleCallConference(intent);
+            case PjActions.ACTIVATE_AUDIO_SESSION:
+                handleActivateAudioSession(intent);
+                break;
+            case PjActions.DEACTIVATE_AUDIO_SESSION:
+                handleDeactivateAudioSession(intent);
+                break;
             case PjActions.ACTION_CHANGE_CODEC_SETTINGS:
                 handleChangeCodecSettings(intent);
                 break;
@@ -619,7 +645,8 @@ public class PjSipService extends Service {
 
             if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
 
-                NotificationChannel notificationChannel = new NotificationChannel("1111", "Main Channel", NotificationManager.IMPORTANCE_DEFAULT);
+                NotificationChannel notificationChannel = new NotificationChannel("pjsip.service", "Service Running", NotificationManager.IMPORTANCE_DEFAULT);
+                notificationChannel.setShowBadge(false);
                 NotificationManager notificationManager = getSystemService(NotificationManager.class);
                 notificationManager.createNotificationChannel(notificationChannel);
                 notificationBuilder.setChannelId(notificationChannel.getId());
@@ -1053,6 +1080,38 @@ public class PjSipService extends Service {
         } catch (Exception e) {
             mEmitter.fireIntentHandled(intent, e);
         }
+    }
+
+    private void handleActivateAudioSession(Intent intent) {
+        int focusRequest;
+        if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ) {
+            focusRequest = mAudioManager.requestAudioFocus(callAudioFocusRequest);
+        } else {
+            focusRequest = mAudioManager.requestAudioFocus(this, AudioManager.STREAM_VOICE_CALL, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT);
+        }
+
+        switch (focusRequest) {
+            case AudioManager.AUDIOFOCUS_REQUEST_FAILED:
+                // don't start playback
+                Log.d(TAG, "Audio focus request failed");
+            case AudioManager.AUDIOFOCUS_REQUEST_GRANTED:
+                // actually start playback
+                Log.d(TAG, "Audio focus request successful");
+        }
+
+    }
+
+    private void handleDeactivateAudioSession(Intent intent) {
+        if( Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ) {
+            mAudioManager.abandonAudioFocusRequest(callAudioFocusRequest);
+        } else {
+            mAudioManager.abandonAudioFocus(this);
+        }
+    }
+
+    @Override
+    public void onAudioFocusChange(int focusChange) {
+
     }
 
     @Override
@@ -1525,6 +1584,8 @@ public class PjSipService extends Service {
     private void releaseAudioFocus() {
         mAudioManager.abandonAudioFocus(focusChangeListener);
     }
+
+
 
 
     protected class PhoneStateChangedReceiver extends BroadcastReceiver {
