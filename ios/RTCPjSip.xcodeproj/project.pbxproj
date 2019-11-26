@@ -7,6 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		16023BD2236C8D5E0011787E /* libReact-Core.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 16023BD1236C8D5E0011787E /* libReact-Core.a */; };
+		16023BD4236C8D6F0011787E /* libReactCommon.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 16023BD3236C8D6F0011787E /* libReactCommon.a */; };
+		16023BD6236C8D820011787E /* libReact-CoreModules.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 16023BD5236C8D820011787E /* libReact-CoreModules.a */; };
+		16023BD9236C93AB0011787E /* libReact-cxxreact.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 16023BD8236C93AB0011787E /* libReact-cxxreact.a */; };
+		16023BDB236C93AB0011787E /* libReact-jsi.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 16023BDA236C93AB0011787E /* libReact-jsi.a */; };
+		16023BDD236C93AB0011787E /* libReact-jsiexecutor.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 16023BDC236C93AB0011787E /* libReact-jsiexecutor.a */; };
+		16023BDF236C93AB0011787E /* libReact-jsinspector.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 16023BDE236C93AB0011787E /* libReact-jsinspector.a */; };
 		166DB575233BB8B1008C0D0D /* AudioHelper.m in Sources */ = {isa = PBXBuildFile; fileRef = 166DB574233BB8B1008C0D0D /* AudioHelper.m */; };
 		A61DD9FB1E66BE9300278F2D /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A61DD9FA1E66BE9300278F2D /* AVFoundation.framework */; };
 		A6259A861E69889E0089146B /* PjSipMessage.m in Sources */ = {isa = PBXBuildFile; fileRef = A6259A851E69889E0089146B /* PjSipMessage.m */; };
@@ -36,6 +43,13 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		16023BD1236C8D5E0011787E /* libReact-Core.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = "libReact-Core.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		16023BD3236C8D6F0011787E /* libReactCommon.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = libReactCommon.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		16023BD5236C8D820011787E /* libReact-CoreModules.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = "libReact-CoreModules.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		16023BD8236C93AB0011787E /* libReact-cxxreact.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = "libReact-cxxreact.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		16023BDA236C93AB0011787E /* libReact-jsi.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = "libReact-jsi.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		16023BDC236C93AB0011787E /* libReact-jsiexecutor.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = "libReact-jsiexecutor.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		16023BDE236C93AB0011787E /* libReact-jsinspector.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = "libReact-jsinspector.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		166DB574233BB8B1008C0D0D /* AudioHelper.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AudioHelper.m; sourceTree = "<group>"; };
 		166DB576233BBB41008C0D0D /* AudioHelper.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AudioHelper.h; sourceTree = "<group>"; };
 		A61DD9FA1E66BE9300278F2D /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
@@ -68,6 +82,13 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				16023BD9236C93AB0011787E /* libReact-cxxreact.a in Frameworks */,
+				16023BDB236C93AB0011787E /* libReact-jsi.a in Frameworks */,
+				16023BDD236C93AB0011787E /* libReact-jsiexecutor.a in Frameworks */,
+				16023BDF236C93AB0011787E /* libReact-jsinspector.a in Frameworks */,
+				16023BD6236C8D820011787E /* libReact-CoreModules.a in Frameworks */,
+				16023BD4236C8D6F0011787E /* libReactCommon.a in Frameworks */,
+				16023BD2236C8D5E0011787E /* libReact-Core.a in Frameworks */,
 				A61DD9FB1E66BE9300278F2D /* AVFoundation.framework in Frameworks */,
 				A6D8F1201E65E482007D5702 /* CallKit.framework in Frameworks */,
 				FD906A282012546C0066368D /* VialerPJSIP.framework in Frameworks */,
@@ -81,6 +102,13 @@
 		A6A12F5D1E65A8400002151D /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				16023BD8236C93AB0011787E /* libReact-cxxreact.a */,
+				16023BDA236C93AB0011787E /* libReact-jsi.a */,
+				16023BDC236C93AB0011787E /* libReact-jsiexecutor.a */,
+				16023BDE236C93AB0011787E /* libReact-jsinspector.a */,
+				16023BD5236C8D820011787E /* libReact-CoreModules.a */,
+				16023BD3236C8D6F0011787E /* libReactCommon.a */,
+				16023BD1236C8D5E0011787E /* libReact-Core.a */,
 				A6D3BE301E6845AF00949DCF /* VialerPJSIP */,
 				FD906A272012546C0066368D /* VialerPJSIP.framework */,
 				A61DD9FA1E66BE9300278F2D /* AVFoundation.framework */,
