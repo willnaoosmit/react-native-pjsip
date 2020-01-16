@@ -141,4 +141,20 @@ public class PjSipBroadcastEmiter {
 
         context.sendBroadcast(intent);
     }
+
+    public void fireCallAnsweredEvent(int callId) {
+        Intent intent = new Intent();
+        intent.setAction(PjActions.EVENT_INCOMING_CALL_ANSWERED);
+        intent.putExtra("call_id", callId);
+        context.sendBroadcast(intent);
+    }
+
+    public void fireCallDeclinedEvent(int callId) {
+        Intent intent = new Intent();
+        intent.setAction(PjActions.EVENT_INCOMING_CALL_DECLINED);
+        intent.putExtra("call_id", callId);
+        context.sendBroadcast(intent);
+    }
+
+
 }

@@ -43,8 +43,10 @@ import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.view.KeyEvent;
 
+import com.carusto.ReactNativePjSip.Custom.PjNotificationsManager;
 import com.carusto.ReactNativePjSip.dto.AccountConfigurationDTO;
 import com.carusto.ReactNativePjSip.dto.CallSettingsDTO;
+import com.carusto.ReactNativePjSip.dto.IncomingCallDTO;
 import com.carusto.ReactNativePjSip.dto.ServiceConfigurationDTO;
 import com.carusto.ReactNativePjSip.dto.SipMessageDTO;
 import com.carusto.ReactNativePjSip.utils.ArgumentUtils;
@@ -156,7 +158,7 @@ public class PjSipService extends Service implements AudioManager.OnAudioFocusCh
     private int phoneDefaultRingerMode;
     private boolean isRinging = false;
     private MediaSessionCompat mMediaSessionCompat;
-
+    private PjNotificationsManager mPjNotificationsManager;
 
 
     @Override
@@ -302,7 +304,7 @@ public class PjSipService extends Service implements AudioManager.OnAudioFocusCh
                 Log.d(TAG, "Getting service config from map");
                 mServiceConfiguration = ServiceConfigurationDTO.fromMap((Map) intent.getSerializableExtra("service"));
             }
-
+            mPjNotificationsManager = new PjNotificationsManager(this);
             mWorkerThread = new HandlerThread(getClass().getSimpleName(), Process.THREAD_PRIORITY_FOREGROUND);
             mWorkerThread.setPriority(Thread.MAX_PRIORITY);
             mWorkerThread.start();
@@ -382,8 +384,11 @@ public class PjSipService extends Service implements AudioManager.OnAudioFocusCh
         } catch (Exception e) {
             Log.w(TAG, "Error Unregistering PhoneStateChangedReceiver", e);
         }
-        ringbackPlayer.release();
-        ringbackPlayer = null;
+        if(ringbackPlayer != null){
+            ringbackPlayer.release();
+            ringbackPlayer = null;
+
+        }
         Log.d(TAG, "Stopping service");
         super.onDestroy();
     }
@@ -523,6 +528,10 @@ public class PjSipService extends Service implements AudioManager.OnAudioFocusCh
                 handleChangeCodecSettings(intent);
                 break;
 
+            case PjActions.START_INCOMING_CALL:
+                handleStartIncomingCall(intent);
+                break;
+
             // Configuration actions
             case PjActions.ACTION_SET_SERVICE_CONFIGURATION:
                 handleSetServiceConfiguration(intent);
@@ -541,8 +550,9 @@ public class PjSipService extends Service implements AudioManager.OnAudioFocusCh
             }
 
             if(!mNotificationRunning) {
-                createRunningNotification();
-
+//                createRunningNotification();
+                mPjNotificationsManager.createRunningNotification(mServiceConfiguration);
+                mNotificationRunning = true;
             }
 
             CodecInfoVector codVect = mEndpoint.codecEnum();
@@ -643,6 +653,7 @@ public class PjSipService extends Service implements AudioManager.OnAudioFocusCh
                     .setContentIntent(openAppPendingIntent);
 
 
+
             if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
 
                 NotificationChannel notificationChannel = new NotificationChannel("pjsip.service", "Service Running", NotificationManager.IMPORTANCE_DEFAULT);
@@ -653,7 +664,7 @@ public class PjSipService extends Service implements AudioManager.OnAudioFocusCh
             }
             mNotificationRunning = true;
 
-            startForeground(1, notificationBuilder.build());
+            startForeground(9999, notificationBuilder.build());
 
         } catch (Exception e) {
             Log.w(TAG, "Error starting foreground notification", e);
@@ -940,7 +951,7 @@ public class PjSipService extends Service implements AudioManager.OnAudioFocusCh
             CallOpParam prm = new CallOpParam();
             prm.setStatusCode(pjsip_status_code.PJSIP_SC_OK);
             call.answer(prm);
-
+            mPjNotificationsManager.stopIncomingCallNotification(callId);
             // Automatically put other calls on hold.
             doPauseParallelCalls(call);
 
@@ -1107,6 +1118,15 @@ public class PjSipService extends Service implements AudioManager.OnAudioFocusCh
         } else {
             mAudioManager.abandonAudioFocus(this);
         }
+    }
+
+    private void handleStartIncomingCall(Intent intent) {
+       try{
+            mPjNotificationsManager.sendIncomingCallNotification(IncomingCallDTO.fromBundle(intent.getExtras()), mCalls.size() );
+            mEmitter.fireIntentHandled(intent);
+       } catch (Exception e) {
+            mEmitter.fireIntentHandled(intent, e);
+       }
     }
 
     @Override
@@ -1297,23 +1317,23 @@ public class PjSipService extends Service implements AudioManager.OnAudioFocusCh
 //             prm.setStatusCode(pjsip_status_code.PJSIP_SC_RINGING);
 //             call.answer(prm);
 
-             String ns = getApplicationContext().getPackageName();
-             String cls = ns + ".MainActivity";
-
-             Intent intent = new Intent(getApplicationContext(), Class.forName(cls));
-             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-             intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT );
-             intent.addCategory(Intent.CATEGORY_LAUNCHER);
-             intent.putExtra("foreground", true);
-
-             startActivity(intent);
+//             String ns = getApplicationContext().getPackageName();
+//             String cls = ns + ".MainActivity";
+//
+//             Intent intent = new Intent(getApplicationContext(), Class.forName(cls));
+//             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+//             intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT );
+//             intent.addCategory(Intent.CATEGORY_LAUNCHER);
+//             intent.putExtra("foreground", true);
+//
+//             startActivity(intent);
          } catch (Exception e) {
              Log.w(TAG, "Failed to open application on received call", e);
          }
 
          //if there aren't any calls present we should ring
          if(mCalls.size() <= 0) {
-             ring(true);
+//             ring(true);
          }
 
          job(new Runnable() {
@@ -1367,7 +1387,7 @@ public class PjSipService extends Service implements AudioManager.OnAudioFocusCh
             //if the phone is ringing and the call state updates to any state different from the ones below it should stop ringing.
             if( isRinging && call.getInfo().getState() != pjsip_inv_state.PJSIP_INV_STATE_NULL && call.getInfo().getState() != pjsip_inv_state.PJSIP_INV_STATE_INCOMING  &&  call.getInfo().getState() != pjsip_inv_state.PJSIP_INV_STATE_EARLY) {
                 Log.w(TAG, "Ringing stopped due to state: " + call.getInfo().getState());
-                ring(false);
+//                ring(false);
 
             }
             if (call.getInfo().getState() == pjsip_inv_state.PJSIP_INV_STATE_DISCONNECTED) {
@@ -1423,6 +1443,7 @@ public class PjSipService extends Service implements AudioManager.OnAudioFocusCh
     void emmitCallTerminated(PjSipCall call, OnCallStateParam prm) {
         final int callId = call.getId();
         Log.d(TAG, "ring emmitCallTerminated: " + mCalls.size());
+        mPjNotificationsManager.stopIncomingCallNotification(call.getId());
         job(new Runnable() {
             @Override
             public void run() {

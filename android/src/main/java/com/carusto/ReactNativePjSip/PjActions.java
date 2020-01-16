@@ -8,6 +8,7 @@ import android.os.Bundle;
 import android.util.Log;
 
 import com.carusto.ReactNativePjSip.dto.CallSettingsDTO;
+import com.carusto.ReactNativePjSip.dto.IncomingCallDTO;
 import com.carusto.ReactNativePjSip.dto.SipMessageDTO;
 import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.bridge.ReadableMapKeySetIterator;
@@ -50,6 +51,8 @@ public class PjActions {
     public static final String ACTIVATE_AUDIO_SESSION = "activate_audio_session'";
     public static final String DEACTIVATE_AUDIO_SESSION = "deactivate_audio_session'";
 
+    public static final String START_INCOMING_CALL = "start_incoming_call'";
+
     public static final String EVENT_STARTED = "com.carusto.account.started";
     public static final String EVENT_SERVICE_STOPPED = "com.carusto.service.stopped";
     public static final String EVENT_ACCOUNT_CREATED = "com.carusto.account.created";
@@ -61,6 +64,8 @@ public class PjActions {
     public static final String EVENT_CALL_SCREEN_LOCKED = "com.carusto.call.screen.locked";
     public static final String EVENT_MESSAGE_RECEIVED = "com.carusto.message.received";
     public static final String EVENT_HANDLED = "com.carusto.handled";
+    public static final String EVENT_INCOMING_CALL_ANSWERED = "com.carusto.incoming.call.answered";
+    public static final String EVENT_INCOMING_CALL_DECLINED = "com.carusto.incoming.call.declined";
 
     public static Intent createStartIntent(int callbackId, ReadableMap configuration, Context context) {
         Intent intent = new Intent(context, PjSipService.class);
@@ -294,6 +299,15 @@ public class PjActions {
         return intent;
     }
 
+    public static Intent createIncomingCallIntent(int callbackId, ReadableMap data, Context context) {
+        Intent intent = new Intent(context, PjSipService.class);
+        intent.setAction(PjActions.START_INCOMING_CALL);
+        intent.putExtra("callback_id", callbackId);
+        formatIntent(intent, data);
+
+
+        return intent;
+    }
     public static Intent createStopServiceIntent(Context context) {
         Intent intent = new Intent(context, PjSipService.class);
         intent.setAction(PjActions.ACTION_STOP_SERVICE);

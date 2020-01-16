@@ -7,6 +7,8 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.media.AudioManager;
 import android.util.Log;
+
+import com.carusto.ReactNativePjSip.Custom.PjNotificationsManager;
 import com.carusto.ReactNativePjSip.utils.ArgumentUtils;
 import com.facebook.react.bridge.Callback;
 import com.facebook.react.bridge.ReactApplicationContext;
@@ -27,6 +29,7 @@ public class PjSipBroadcastReceiver extends BroadcastReceiver {
     private HashMap<Integer, Callback> callbacks = new HashMap<>();
 
     private AudioManager audioManager;
+
 
     public PjSipBroadcastReceiver(ReactApplicationContext context) {
         this.context = context;
@@ -56,6 +59,10 @@ public class PjSipBroadcastReceiver extends BroadcastReceiver {
         filter.addAction(PjActions.EVENT_CALL_SCREEN_LOCKED);
         filter.addAction(PjActions.EVENT_MESSAGE_RECEIVED);
         filter.addAction(PjActions.EVENT_HANDLED);
+        Log.d(TAG, "Adding new event filters" );
+
+        filter.addAction(PjActions.EVENT_INCOMING_CALL_DECLINED);
+        filter.addAction(PjActions.EVENT_INCOMING_CALL_ANSWERED);
 
 //        filter.addAction("android.intent.action.MEDIA_BUTTON");
 
@@ -67,7 +74,7 @@ public class PjSipBroadcastReceiver extends BroadcastReceiver {
         String action = intent.getAction();
 
         Log.d(TAG, "Received \""+ action +"\" response from service (" + ArgumentUtils.dumpIntentExtraParameters(intent) + ")");
-
+        PjNotificationsManager manager = new PjNotificationsManager(this.context);
         switch (action) {
             case PjActions.EVENT_STARTED:
                 onCallback(intent);
@@ -95,6 +102,21 @@ public class PjSipBroadcastReceiver extends BroadcastReceiver {
                 break;
             case PjActions.EVENT_CALL_TERMINATED:
                 onCallTerminated(intent);
+                break;
+            case PjActions.EVENT_INCOMING_CALL_ANSWERED:
+
+                Log.d(TAG, "chinga CALL ANSWERED");
+                int answeredCallId = intent.getIntExtra("call_id", 0);
+
+                onCallActionAnswer(answeredCallId);
+                manager.stopIncomingCallNotification(answeredCallId);
+                break;
+            case PjActions.EVENT_INCOMING_CALL_DECLINED:
+                int declinedCallId = intent.getIntExtra("call_id", 0);
+
+                Log.d(TAG, "CALL DECLINED");
+                onCallActionDecline(declinedCallId);
+                manager.stopIncomingCallNotification(declinedCallId);
                 break;
             default:
                 onCallback(intent);
@@ -156,7 +178,17 @@ public class PjSipBroadcastReceiver extends BroadcastReceiver {
 
         emit("pjSipCallServiceStopped", null);
     }
+    private void onCallActionAnswer(int callId) {
 
+        emit("pjSipCallAnsweredFromAction", callId);
+
+    }
+
+    private void onCallActionDecline(int callId) {
+
+        emit("pjSipCallDeclinedFromAction", callId);
+
+    }
     private void onCallback(Intent intent) {
         // Define callback
         Callback callback = null;

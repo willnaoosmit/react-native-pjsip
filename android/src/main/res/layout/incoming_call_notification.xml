@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerVertical="true"
+        android:orientation="vertical">
+
+        <TextView
+            android:text="Moises Ynfante"
+            android:id="@+id/caller"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            style="@android:style/TextAppearance.Material.Notification.Title"/>
+
+        <TextView
+            android:text="407-123-2445"
+            android:id="@+id/sip_uri"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/primary_color"
+            style="@android:style/TextAppearance.Material.Notification.Line2"/>
+
+        <TextView
+            android:text="Incoming Call"
+            android:id="@+id/incoming_call_info"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            style="@android:style/TextAppearance.Material.Notification.Info"/>
+
+    </LinearLayout>
+
+
+
+</RelativeLayout>

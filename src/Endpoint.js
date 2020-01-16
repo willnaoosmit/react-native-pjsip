@@ -65,6 +65,10 @@ export default class Endpoint extends EventEmitter {
         DeviceEventEmitter.addListener('pjSipBluetoothConnectionChanged', this._onBluetoothConnectionChanged.bind(this));
         DeviceEventEmitter.addListener('BtHeadsetConnected', this._onBtHeadsetConnected.bind(this));
         DeviceEventEmitter.addListener('BtHeadsetDisconnected', this._onBtHeadsetDisconnected.bind(this));
+
+        //Subscribe to external call actions (android only)
+        DeviceEventEmitter.addListener('pjSipCallDeclinedFromAction', this._onCallDeclinedFromAction.bind(this));
+        DeviceEventEmitter.addListener('pjSipCallAnsweredFromAction', this._onCallAnsweredFromAction.bind(this));
     }
 
     /**
@@ -610,6 +614,18 @@ export default class Endpoint extends EventEmitter {
         })
     }
 
+    sendIncomingCallNotification(callInfo = {}) {
+        if (Platform.OS === 'ios') return false;
+        return new Promise( (resolve, reject) => {
+            NativeModules.PjSipModule.sendIncomingCallNotification(callInfo, (successful, wasEnabled ) => {
+                if(successful)
+                    resolve(wasEnabled);
+                else 
+                    reject();
+            });
+        })
+    }
+
     /**
      * @fires Endpoint#connectivity_changed
      * @private
@@ -751,6 +767,14 @@ export default class Endpoint extends EventEmitter {
 
     _onBtHeadsetDisconnected() {
         this.emit('bt_headset_disconnected');
+    }
+    _onCallAnsweredFromAction(callId) {
+        const call = new Call({id: callId});
+        this.emit('call_answered_from_action', call);
+    }
+    _onCallDeclinedFromAction(callId) {
+        const call = new Call({id: callId});
+        this.emit('call_declined_from_action', call);
     }
 
     /**
